@@ -36,6 +36,7 @@ export default function TimeTracking() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(false);
+  const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     loadUsers();
@@ -173,6 +174,150 @@ export default function TimeTracking() {
     }
   };
 
+  const handleClearMonth = async (userId: number) => {
+    const confirmed = window.confirm('Удалить все часы за месяц для этого сотрудника?');
+    if (!confirmed) return;
+
+    const daysInMonth = getDaysInMonth();
+    const promises = [];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      promises.push(
+        fetch(SCHEDULE_API, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: userId,
+            work_date: dateStr,
+            hours: 0,
+            comment: ''
+          })
+        })
+      );
+    }
+
+    try {
+      setLoading(true);
+      await Promise.all(promises);
+      toast.success('Часы очищены');
+      loadTimesheet();
+    } catch (error) {
+      toast.error('Ошибка очистки');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkEdit = async (userId: number) => {
+    const hoursInput = window.prompt('Введите количество часов для всех будних дней месяца:');
+    if (hoursInput === null) return;
+
+    const hours = parseFloat(hoursInput);
+    if (isNaN(hours) || hours < 0 || hours > 24) {
+      toast.error('Введите корректное число от 0 до 24');
+      return;
+    }
+
+    const daysInMonth = getDaysInMonth();
+    const promises = [];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dayOfWeek = new Date(dateStr).getDay();
+      
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        promises.push(
+          fetch(SCHEDULE_API, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: userId,
+              work_date: dateStr,
+              hours: hours,
+              comment: ''
+            })
+          })
+        );
+      }
+    }
+
+    try {
+      setLoading(true);
+      await Promise.all(promises);
+      toast.success(`Установлено ${hours} часов для всех будних дней`);
+      loadTimesheet();
+    } catch (error) {
+      toast.error('Ошибка обновления');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFillWeekRange = async (userId: number, startDay: number) => {
+    const promises = [];
+    for (let i = 0; i < 7; i++) {
+      const day = startDay + i;
+      if (day > getDaysInMonth()) break;
+      
+      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dayOfWeek = new Date(dateStr).getDay();
+      
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        promises.push(
+          fetch(SCHEDULE_API, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: userId,
+              work_date: dateStr,
+              hours: 8,
+              comment: ''
+            })
+          })
+        );
+      }
+    }
+
+    try {
+      await Promise.all(promises);
+      toast.success('Неделя заполнена');
+      loadTimesheet();
+    } catch (error) {
+      toast.error('Ошибка заполнения');
+    }
+  };
+
+  const handleClearWeekRange = async (userId: number, startDay: number) => {
+    const promises = [];
+    for (let i = 0; i < 7; i++) {
+      const day = startDay + i;
+      if (day > getDaysInMonth()) break;
+      
+      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      promises.push(
+        fetch(SCHEDULE_API, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: userId,
+            work_date: dateStr,
+            hours: 0,
+            comment: ''
+          })
+        })
+      );
+    }
+
+    try {
+      await Promise.all(promises);
+      toast.success('Неделя очищена');
+      loadTimesheet();
+    } catch (error) {
+      toast.error('Ошибка очистки');
+    }
+  };
+
   const handlePrint = () => {
     const daysInMonth = getDaysInMonth();
     const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
@@ -276,14 +421,69 @@ export default function TimeTracking() {
           </div>
         </CardHeader>
         <CardContent>
+          <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <Icon name="Info" size={16} className="text-blue-600 mt-0.5" />
+              <div className="text-xs text-gray-700">
+                <strong>Возможности табеля:</strong>
+                <ul className="mt-1 space-y-1 ml-2">
+                  <li>• Кнопки у каждого сотрудника: заполнить месяц (8ч), установить свои часы, очистить</li>
+                  <li>• Быстрые действия для всех сотрудников по неделям ниже</li>
+                  <li>• Выходные дни выделены серым фоном</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div className="mb-3 flex gap-2 flex-wrap items-center">
+            <div className="text-xs font-medium text-gray-700">Быстрые действия для всех:</div>
+            {[1, 8, 15, 22].map(startDay => {
+              const weekNum = Math.ceil(startDay / 7);
+              return (
+                <div key={startDay} className="flex gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => {
+                      timesheet.forEach(user => handleFillWeekRange(user.user_id, startDay));
+                    }}
+                  >
+                    Заполнить {weekNum} неделю
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs text-red-600"
+                    onClick={() => {
+                      if (window.confirm(`Очистить ${weekNum} неделю для всех сотрудников?`)) {
+                        timesheet.forEach(user => handleClearWeekRange(user.user_id, startDay));
+                      }
+                    }}
+                  >
+                    Очистить {weekNum}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-xs">
               <thead>
                 <tr className="bg-gray-50">
                   <th className="border p-2 text-left sticky left-0 bg-gray-50 min-w-[150px]">ФИО</th>
-                  {days.map(day => (
-                    <th key={day} className="border p-1 text-center min-w-[50px]">{day}</th>
-                  ))}
+                  {days.map(day => {
+                    const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const dayOfWeek = new Date(dateStr).getDay();
+                    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                    return (
+                      <th key={day} className={cn('border p-1 text-center min-w-[50px]', isWeekend && 'bg-gray-200')}>
+                        {day}
+                        <div className="text-[8px] text-gray-500">
+                          {['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'][dayOfWeek]}
+                        </div>
+                      </th>
+                    );
+                  })}
                   <th className="border p-2 text-center min-w-[70px]">Итого</th>
                 </tr>
               </thead>
@@ -293,17 +493,35 @@ export default function TimeTracking() {
                   return (
                     <tr key={user.user_id} className="hover:bg-gray-50">
                       <td className="border p-2 font-medium sticky left-0 bg-white">
-                        <div className="flex items-center justify-between gap-2">
-                          <span>{user.full_name}</span>
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-xs">{user.full_name}</span>
                           <div className="flex gap-1">
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-6 px-2 text-xs"
+                              className="h-6 px-1"
                               onClick={() => handleFillMonth(user.user_id)}
                               title="Заполнить месяц по 8ч (пн-пт)"
                             >
-                              <Icon name="CalendarDays" size={12} />
+                              <Icon name="CalendarPlus" size={12} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-1"
+                              onClick={() => handleBulkEdit(user.user_id)}
+                              title="Установить свое количество часов"
+                            >
+                              <Icon name="Edit3" size={12} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-1 text-red-600 hover:text-red-700"
+                              onClick={() => handleClearMonth(user.user_id)}
+                              title="Очистить месяц"
+                            >
+                              <Icon name="Trash2" size={12} />
                             </Button>
                           </div>
                         </div>
@@ -313,13 +531,15 @@ export default function TimeTracking() {
                         const record = user.days[dateStr];
                         const hours = record?.hours || 0;
                         const isFired = !isDateBeforeFired(dateStr, user.fired_at);
+                        const dayOfWeek = new Date(dateStr).getDay();
+                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
                         
                         if (!isFired) {
                           totalHours += hours;
                         }
 
                         return (
-                          <td key={day} className={cn('border p-0', isFired && 'bg-gray-100')}>
+                          <td key={day} className={cn('border p-0', isFired && 'bg-gray-100', isWeekend && !isFired && 'bg-gray-50')}>
                             {!isFired ? (
                               <Input
                                 type="number"
@@ -328,7 +548,7 @@ export default function TimeTracking() {
                                 max="24"
                                 value={hours || ''}
                                 onChange={(e) => handleHoursChange(user.user_id, dateStr, e.target.value, record?.comment || '')}
-                                className="border-0 text-center h-8 text-xs"
+                                className={cn('border-0 text-center h-8 text-xs', isWeekend && 'bg-gray-50')}
                                 placeholder="-"
                               />
                             ) : (
