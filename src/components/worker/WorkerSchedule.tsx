@@ -75,7 +75,10 @@ export default function WorkerSchedule({ userId, userName, scheduleApi }: Worker
     try {
       const response = await fetch(scheduleApi, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-User-Id': String(userId)
+        },
         body: JSON.stringify({
           user_id: userId,
           work_date: dateStr,
@@ -88,7 +91,8 @@ export default function WorkerSchedule({ userId, userName, scheduleApi }: Worker
         await loadTimesheet();
         toast.success('Часы обновлены');
       } else {
-        toast.error('Ошибка обновления');
+        const error = await response.json();
+        toast.error(error.error || 'Ошибка обновления');
       }
     } catch (error) {
       toast.error('Ошибка сервера');

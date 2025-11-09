@@ -167,6 +167,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             work_date = body_data.get('work_date')
             hours = body_data.get('hours')
             comment = body_data.get('comment', '')
+            requesting_user_id = event.get('headers', {}).get('x-user-id')
+            
+            # Проверка прав: работники могут редактировать только свой табель
+            if requesting_user_id and user_id:
+                cur.execute("SELECT role FROM users WHERE id = %s", (requesting_user_id,))
+                user_row = cur.fetchone()
+                if user_row and user_row['role'] == 'worker' and str(user_id) != str(requesting_user_id):
+                    cur.close()
+                    conn.close()
+                    return {
+                        'statusCode': 403,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'error': 'Вы можете редактировать только свой табель'}),
+                        'isBase64Encoded': False
+                    }
             
             if record_id:
                 cur.execute(

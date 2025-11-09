@@ -1,9 +1,9 @@
 {
   "tests": [
     {
-      "name": "Get time tracking recent",
+      "name": "Get time tracking for month",
       "method": "GET",
-      "path": "/",
+      "path": "/?month=11&year=2025",
       "expectedStatus": 200
     },
     {

@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
-import TimeTracking from '@/components/admin/TimeTracking';
+import SupervisorTimeTracking from '@/components/supervisor/SupervisorTimeTracking';
 import SectionsManagement from '@/components/admin/SectionsManagement';
 import ColorsManagement from '@/components/admin/ColorsManagement';
 import MaterialsManagement from '@/components/admin/MaterialsManagement';
@@ -60,7 +60,9 @@ export default function SupervisorPanel({ user, onLogout }: SupervisorPanelProps
             </TabsTrigger>
           </TabsList>
 
-          <TimeTracking />
+          <TabsContent value="timetracking">
+            <SupervisorTimeTracking userId={user.id} userName={user.full_name} />
+          </TabsContent>
           <SectionsManagement userId={user.id} />
           <ColorsManagement userId={user.id} />
           <MaterialsManagement userId={user.id} />
