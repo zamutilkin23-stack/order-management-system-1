@@ -1,7 +1,7 @@
 {
   "tests": [
     {
-      "name": "Get schedule records",
+      "name": "Get time tracking recent",
       "method": "GET",
       "path": "/",
       "expectedStatus": 200

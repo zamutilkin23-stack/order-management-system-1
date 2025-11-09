@@ -7,6 +7,7 @@ import UsersManagement from '@/components/admin/UsersManagement';
 import SectionsManagement from '@/components/admin/SectionsManagement';
 import ColorsManagement from '@/components/admin/ColorsManagement';
 import MaterialsManagement from '@/components/admin/MaterialsManagement';
+import TimeTracking from '@/components/admin/TimeTracking';
 
 interface User {
   id: number;
@@ -43,7 +44,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="users">
               <Icon name="Users" size={16} className="mr-2" />
               Пользователи
@@ -60,12 +61,17 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
               <Icon name="Package" size={16} className="mr-2" />
               Материалы
             </TabsTrigger>
+            <TabsTrigger value="timetracking">
+              <Icon name="Clock" size={16} className="mr-2" />
+              Табель
+            </TabsTrigger>
           </TabsList>
 
           <UsersManagement />
           <SectionsManagement />
           <ColorsManagement />
           <MaterialsManagement />
+          <TimeTracking />
         </Tabs>
       </div>
     </div>

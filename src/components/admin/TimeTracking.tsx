@@ -8,13 +8,8 @@ import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
+const SCHEDULE_API = 'https://functions.poehali.dev/f617714b-d72a-41e1-87ec-519f6dff2f28';
 const USERS_API = 'https://functions.poehali.dev/cb1be1e9-7f80-4e10-8f1f-4327a0daae82';
-
-interface WorkScheduleProps {
-  userId: number;
-  userRole: string;
-  scheduleApi: string;
-}
 
 interface User {
   id: number;
@@ -35,7 +30,7 @@ interface UserTimesheet {
   days: Record<string, DayRecord>;
 }
 
-export default function WorkSchedule({ userId, userRole, scheduleApi }: WorkScheduleProps) {
+export default function TimeTracking() {
   const [users, setUsers] = useState<User[]>([]);
   const [timesheet, setTimesheet] = useState<UserTimesheet[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -66,7 +61,7 @@ export default function WorkSchedule({ userId, userRole, scheduleApi }: WorkSche
   const loadTimesheet = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${scheduleApi}?month=${selectedMonth}&year=${selectedYear}`);
+      const response = await fetch(`${SCHEDULE_API}?month=${selectedMonth}&year=${selectedYear}`);
       const data = await response.json();
       setTimesheet(data);
     } catch (error) {
@@ -83,6 +78,32 @@ export default function WorkSchedule({ userId, userRole, scheduleApi }: WorkSche
   const isDateBeforeFired = (dateStr: string, firedAt: string | null) => {
     if (!firedAt) return true;
     return new Date(dateStr) <= new Date(firedAt);
+  };
+
+  const handleHoursChange = async (userId: number, dateStr: string, hours: string, comment: string = '') => {
+    const hoursNum = parseFloat(hours) || 0;
+    
+    try {
+      const response = await fetch(SCHEDULE_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          work_date: dateStr,
+          hours: hoursNum,
+          comment
+        })
+      });
+
+      if (response.ok) {
+        toast.success('Часы обновлены');
+        loadTimesheet();
+      } else {
+        toast.error('Ошибка обновления');
+      }
+    } catch (error) {
+      toast.error('Ошибка сервера');
+    }
   };
 
   const handlePrint = () => {
@@ -146,13 +167,13 @@ export default function WorkSchedule({ userId, userRole, scheduleApi }: WorkSche
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
   return (
-    <TabsContent value="schedule" className="space-y-4">
+    <TabsContent value="timetracking" className="space-y-4">
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <Icon name="Calendar" size={20} />
-              График работы
+              <Icon name="Clock" size={20} />
+              Учет рабочего времени
             </CardTitle>
             <div className="flex items-center gap-2">
               <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
@@ -216,10 +237,21 @@ export default function WorkSchedule({ userId, userRole, scheduleApi }: WorkSche
                         }
 
                         return (
-                          <td key={day} className={cn('border p-1 text-center', isFired && 'bg-gray-100')}>
-                            <div className="h-8 flex items-center justify-center text-sm">
-                              {!isFired ? (hours > 0 ? hours : '-') : '-'}
-                            </div>
+                          <td key={day} className={cn('border p-0', isFired && 'bg-gray-100')}>
+                            {!isFired ? (
+                              <Input
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                max="24"
+                                value={hours || ''}
+                                onChange={(e) => handleHoursChange(user.user_id, dateStr, e.target.value, record?.comment || '')}
+                                className="border-0 text-center h-8 text-xs"
+                                placeholder="-"
+                              />
+                            ) : (
+                              <div className="h-8 flex items-center justify-center text-gray-400">-</div>
+                            )}
                           </td>
                         );
                       })}
