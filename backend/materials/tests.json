@@ -1,11 +1,22 @@
 {
   "tests": [
     {
-      "name": "Получение списка материалов",
+      "name": "Get all materials",
       "method": "GET",
       "path": "/",
-      "expectedStatus": 200,
-      "bodyMatcher": "skip"
+      "expectedStatus": 200
+    },
+    {
+      "name": "Get all sections",
+      "method": "GET",
+      "path": "/?type=section",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Test OPTIONS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
     }
   ]
 }

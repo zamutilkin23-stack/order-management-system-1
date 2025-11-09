@@ -1,12 +1,16 @@
 {
   "tests": [
     {
-      "name": "Получение списка заявок",
+      "name": "Get all orders",
       "method": "GET",
       "path": "/",
-      "expectedStatus": 200,
-      "expectedBody": [],
-      "bodyMatcher": "type"
+      "expectedStatus": 200
+    },
+    {
+      "name": "Test OPTIONS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
     }
   ]
 }

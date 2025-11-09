@@ -1,13 +1,14 @@
-'''
-Business: Управление пользователями (создание, удаление, получение списка)
-Args: event - dict с httpMethod, body (user data для POST/DELETE), queryStringParameters
-Returns: HTTP response со списком пользователей или результатом операции
-'''
+"""
+Business: Manage users - create, read, update, delete user accounts
+Args: event with httpMethod (GET/POST/PUT/DELETE), query params, body
+Returns: User list or operation result
+"""
 
 import json
 import os
-import psycopg2
 from typing import Dict, Any
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     method: str = event.get('httpMethod', 'GET')
@@ -17,7 +18,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, X-User-Id',
                 'Access-Control-Max-Age': '86400'
             },
@@ -25,53 +26,30 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'isBase64Encoded': False
         }
     
-    database_url = os.environ.get('DATABASE_URL')
-    
     try:
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         
         if method == 'GET':
-            query_params = event.get('queryStringParameters') or {}
-            include_passwords = query_params.get('include_passwords') == 'true'
+            params = event.get('queryStringParameters') or {}
+            user_id = params.get('id')
             
-            if include_passwords:
-                cur.execute(
-                    "SELECT id, login, password, role, full_name, created_at FROM users ORDER BY created_at DESC"
-                )
-                users = cur.fetchall()
-                
-                result = [{
-                    'id': u[0],
-                    'login': u[1],
-                    'password': u[2],
-                    'role': u[3],
-                    'full_name': u[4],
-                    'created_at': u[5].isoformat() if u[5] else None
-                } for u in users]
+            if user_id:
+                cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+                user = cur.fetchone()
+                result = dict(user) if user else None
             else:
-                cur.execute(
-                    "SELECT id, login, role, full_name, created_at FROM users ORDER BY created_at DESC"
-                )
+                cur.execute("SELECT * FROM users ORDER BY id")
                 users = cur.fetchall()
-                
-                result = [{
-                    'id': u[0],
-                    'login': u[1],
-                    'role': u[2],
-                    'full_name': u[3],
-                    'created_at': u[4].isoformat() if u[4] else None
-                } for u in users]
+                result = [dict(u) for u in users]
             
             cur.close()
             conn.close()
+            
             return {
                 'statusCode': 200,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps(result),
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps(result, default=str),
                 'isBase64Encoded': False
             }
         
@@ -79,55 +57,109 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             body_data = json.loads(event.get('body', '{}'))
             login = body_data.get('login')
             password = body_data.get('password')
-            role = body_data.get('role')
             full_name = body_data.get('full_name')
+            role = body_data.get('role', 'worker')
+            
+            if not all([login, password, full_name]):
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Заполните все поля'}),
+                    'isBase64Encoded': False
+                }
             
             cur.execute(
-                "INSERT INTO users (login, password, role, full_name) VALUES (%s, %s, %s, %s) RETURNING id",
-                (login, password, role, full_name)
+                "INSERT INTO users (login, password, full_name, role, status) VALUES (%s, %s, %s, %s, 'active') RETURNING *",
+                (login, password, full_name, role)
             )
-            user_id = cur.fetchone()[0]
+            user = cur.fetchone()
             conn.commit()
+            cur.close()
+            conn.close()
+            
+            return {
+                'statusCode': 201,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps(dict(user), default=str),
+                'isBase64Encoded': False
+            }
+        
+        elif method == 'PUT':
+            body_data = json.loads(event.get('body', '{}'))
+            user_id = body_data.get('id')
+            
+            if not user_id:
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'ID обязателен'}),
+                    'isBase64Encoded': False
+                }
+            
+            updates = []
+            values = []
+            
+            if 'login' in body_data:
+                updates.append("login = %s")
+                values.append(body_data['login'])
+            if 'password' in body_data:
+                updates.append("password = %s")
+                values.append(body_data['password'])
+            if 'full_name' in body_data:
+                updates.append("full_name = %s")
+                values.append(body_data['full_name'])
+            if 'role' in body_data:
+                updates.append("role = %s")
+                values.append(body_data['role'])
+            if 'status' in body_data:
+                updates.append("status = %s")
+                values.append(body_data['status'])
+            
+            if updates:
+                updates.append("updated_at = CURRENT_TIMESTAMP")
+                values.append(user_id)
+                query = f"UPDATE users SET {', '.join(updates)} WHERE id = %s RETURNING *"
+                cur.execute(query, values)
+                user = cur.fetchone()
+                conn.commit()
+                
+                result = dict(user) if user else None
+            else:
+                result = {'error': 'Нет данных для обновления'}
             
             cur.close()
             conn.close()
+            
             return {
-                'statusCode': 201,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps({'success': True, 'id': user_id}),
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps(result, default=str),
                 'isBase64Encoded': False
             }
         
         elif method == 'DELETE':
-            body_data = json.loads(event.get('body', '{}'))
-            user_id = body_data.get('id')
+            params = event.get('queryStringParameters') or {}
+            user_id = params.get('id')
+            
+            if not user_id:
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'ID обязателен'}),
+                    'isBase64Encoded': False
+                }
             
             cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
             conn.commit()
-            
             cur.close()
             conn.close()
+            
             return {
                 'statusCode': 200,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
                 'body': json.dumps({'success': True}),
                 'isBase64Encoded': False
             }
-        
-        cur.close()
-        conn.close()
-        return {
-            'statusCode': 405,
-            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({'error': 'Метод не поддерживается'}),
-            'isBase64Encoded': False
-        }
         
     except Exception as e:
         return {
@@ -136,3 +168,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'body': json.dumps({'error': str(e)}),
             'isBase64Encoded': False
         }
+    
+    return {
+        'statusCode': 405,
+        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+        'body': json.dumps({'error': 'Метод не поддерживается'}),
+        'isBase64Encoded': False
+    }

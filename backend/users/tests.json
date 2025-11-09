@@ -1,11 +1,16 @@
 {
   "tests": [
     {
-      "name": "Получение списка пользователей",
+      "name": "Get all users",
       "method": "GET",
       "path": "/",
-      "expectedStatus": 200,
-      "bodyMatcher": "skip"
+      "expectedStatus": 200
+    },
+    {
+      "name": "Test OPTIONS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
     }
   ]
 }

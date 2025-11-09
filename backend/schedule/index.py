@@ -1,14 +1,15 @@
-'''
-Business: Управление графиком работы сотрудников (ввод часов, получение данных)
-Args: event - dict с httpMethod, body (schedule data), queryStringParameters (year, month)
-Returns: HTTP response с данными графика или результатом операции
-'''
+"""
+Business: Manage work schedule with hours tracking per employee
+Args: event with httpMethod, query params for filtering by user/month
+Returns: Schedule data or operation result
+"""
 
 import json
 import os
-import psycopg2
 from typing import Dict, Any
 from datetime import datetime
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     method: str = event.get('httpMethod', 'GET')
@@ -18,7 +19,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, X-User-Id',
                 'Access-Control-Max-Age': '86400'
             },
@@ -26,63 +27,69 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'isBase64Encoded': False
         }
     
-    database_url = os.environ.get('DATABASE_URL')
-    
     try:
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         
         if method == 'GET':
             params = event.get('queryStringParameters') or {}
-            year = params.get('year')
+            user_id = params.get('user_id')
             month = params.get('month')
+            year = params.get('year')
             
-            if not year or not month:
-                now = datetime.now()
-                year = str(now.year)
-                month = str(now.month)
+            if user_id and month and year:
+                cur.execute(
+                    """SELECT ws.*, u.full_name 
+                       FROM work_schedule ws 
+                       JOIN users u ON ws.user_id = u.id 
+                       WHERE ws.user_id = %s 
+                       AND EXTRACT(MONTH FROM ws.work_date) = %s 
+                       AND EXTRACT(YEAR FROM ws.work_date) = %s 
+                       ORDER BY ws.work_date""",
+                    (user_id, month, year)
+                )
+                records = cur.fetchall()
+                result = [dict(row) for row in records]
+                
+                total_hours = sum(float(row['hours']) for row in records)
+                result = {
+                    'records': result,
+                    'total_hours': total_hours
+                }
             
-            cur.execute("""
-                SELECT 
-                    s.id, s.user_id, s.work_date, s.hours,
-                    u.full_name, u.login
-                FROM t_p435659_order_management_sys.schedule s
-                JOIN t_p435659_order_management_sys.users u ON s.user_id = u.id
-                WHERE EXTRACT(YEAR FROM s.work_date) = %s 
-                  AND EXTRACT(MONTH FROM s.work_date) = %s
-                ORDER BY s.work_date, u.full_name
-            """, (year, month))
+            elif month and year:
+                cur.execute(
+                    """SELECT ws.*, u.full_name 
+                       FROM work_schedule ws 
+                       JOIN users u ON ws.user_id = u.id 
+                       WHERE EXTRACT(MONTH FROM ws.work_date) = %s 
+                       AND EXTRACT(YEAR FROM ws.work_date) = %s 
+                       AND u.role IN ('worker', 'supervisor')
+                       ORDER BY ws.work_date, u.full_name""",
+                    (month, year)
+                )
+                records = cur.fetchall()
+                result = [dict(row) for row in records]
             
-            records = cur.fetchall()
-            
-            result = [{
-                'id': r[0],
-                'user_id': r[1],
-                'work_date': r[2].isoformat() if r[2] else None,
-                'hours': float(r[3]) if r[3] else 0,
-                'full_name': r[4],
-                'login': r[5]
-            } for r in records]
-            
-            cur.execute("""
-                SELECT id, full_name, login 
-                FROM t_p435659_order_management_sys.users 
-                WHERE role = 'worker'
-                ORDER BY full_name
-            """)
-            users = cur.fetchall()
-            
-            users_list = [{'id': u[0], 'full_name': u[1], 'login': u[2]} for u in users]
+            else:
+                cur.execute(
+                    """SELECT ws.*, u.full_name 
+                       FROM work_schedule ws 
+                       JOIN users u ON ws.user_id = u.id 
+                       WHERE u.role IN ('worker', 'supervisor')
+                       ORDER BY ws.work_date DESC 
+                       LIMIT 100"""
+                )
+                records = cur.fetchall()
+                result = [dict(row) for row in records]
             
             cur.close()
             conn.close()
+            
             return {
                 'statusCode': 200,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps({'schedule': result, 'users': users_list}),
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps(result, default=str),
                 'isBase64Encoded': False
             }
         
@@ -90,64 +97,100 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             body_data = json.loads(event.get('body', '{}'))
             user_id = body_data.get('user_id')
             work_date = body_data.get('work_date')
-            hours = body_data.get('hours', 0)
+            hours = body_data.get('hours')
+            created_by = body_data.get('created_by')
             
-            cur.execute("""
-                INSERT INTO t_p435659_order_management_sys.schedule 
-                (user_id, work_date, hours) 
-                VALUES (%s, %s, %s)
-                ON CONFLICT (user_id, work_date) 
-                DO UPDATE SET hours = %s, updated_at = CURRENT_TIMESTAMP
-                RETURNING id
-            """, (user_id, work_date, hours, hours))
+            if not all([user_id, work_date, hours]):
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Заполните все поля'}),
+                    'isBase64Encoded': False
+                }
             
-            schedule_id = cur.fetchone()[0]
-            conn.commit()
+            try:
+                cur.execute(
+                    """INSERT INTO work_schedule (user_id, work_date, hours, created_by) 
+                       VALUES (%s, %s, %s, %s) RETURNING *""",
+                    (user_id, work_date, hours, created_by)
+                )
+                record = cur.fetchone()
+                conn.commit()
+                result = dict(record)
+            except psycopg2.IntegrityError:
+                conn.rollback()
+                return {
+                    'statusCode': 409,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Запись на эту дату уже существует'}),
+                    'isBase64Encoded': False
+                }
             
             cur.close()
             conn.close()
+            
             return {
                 'statusCode': 201,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps({'success': True, 'id': schedule_id}),
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps(result, default=str),
                 'isBase64Encoded': False
             }
         
         elif method == 'PUT':
             body_data = json.loads(event.get('body', '{}'))
-            schedule_id = body_data.get('id')
-            hours = body_data.get('hours', 0)
+            record_id = body_data.get('id')
+            hours = body_data.get('hours')
             
-            cur.execute("""
-                UPDATE t_p435659_order_management_sys.schedule 
-                SET hours = %s, updated_at = CURRENT_TIMESTAMP 
-                WHERE id = %s
-            """, (hours, schedule_id))
+            if not all([record_id, hours]):
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'ID и часы обязательны'}),
+                    'isBase64Encoded': False
+                }
             
+            cur.execute(
+                "UPDATE work_schedule SET hours = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s RETURNING *",
+                (hours, record_id)
+            )
+            record = cur.fetchone()
             conn.commit()
+            
+            result = dict(record) if record else None
+            
             cur.close()
             conn.close()
+            
             return {
                 'statusCode': 200,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps({'success': True}),
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps(result, default=str),
                 'isBase64Encoded': False
             }
         
-        cur.close()
-        conn.close()
-        return {
-            'statusCode': 405,
-            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({'error': 'Метод не поддерживается'}),
-            'isBase64Encoded': False
-        }
+        elif method == 'DELETE':
+            params = event.get('queryStringParameters') or {}
+            record_id = params.get('id')
+            
+            if not record_id:
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'ID обязателен'}),
+                    'isBase64Encoded': False
+                }
+            
+            cur.execute("DELETE FROM work_schedule WHERE id = %s", (record_id,))
+            conn.commit()
+            cur.close()
+            conn.close()
+            
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'success': True}),
+                'isBase64Encoded': False
+            }
         
     except Exception as e:
         return {
@@ -156,3 +199,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'body': json.dumps({'error': str(e)}),
             'isBase64Encoded': False
         }
+    
+    return {
+        'statusCode': 405,
+        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+        'body': json.dumps({'error': 'Метод не поддерживается'}),
+        'isBase64Encoded': False
+    }

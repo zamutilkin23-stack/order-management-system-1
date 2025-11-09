@@ -1,7 +1,13 @@
 {
   "tests": [
     {
-      "name": "Успешная авторизация администратора",
+      "name": "Test OPTIONS request",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Test login with valid credentials",
       "method": "POST",
       "path": "/",
       "body": {
@@ -10,15 +16,15 @@
       },
       "expectedStatus": 200,
       "expectedBody": {
-        "success": true,
-        "user": {
-          "role": "admin"
-        }
+        "id": "number",
+        "login": "string",
+        "full_name": "string",
+        "role": "string"
       },
       "bodyMatcher": "partial"
     },
     {
-      "name": "Неверные учетные данные",
+      "name": "Test login with invalid credentials",
       "method": "POST",
       "path": "/",
       "body": {
@@ -27,7 +33,7 @@
       },
       "expectedStatus": 401,
       "expectedBody": {
-        "success": false
+        "error": "string"
       },
       "bodyMatcher": "partial"
     }

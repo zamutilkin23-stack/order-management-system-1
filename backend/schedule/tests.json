@@ -1,8 +1,14 @@
 {
   "tests": [
     {
-      "name": "Получение графика",
+      "name": "Get schedule records",
       "method": "GET",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Test OPTIONS",
+      "method": "OPTIONS",
       "path": "/",
       "expectedStatus": 200
     }
