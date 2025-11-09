@@ -68,9 +68,9 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
           </TabsList>
 
           <UsersManagement />
-          <SectionsManagement />
-          <ColorsManagement />
-          <MaterialsManagement />
+          <SectionsManagement userId={user.id} />
+          <ColorsManagement userId={user.id} />
+          <MaterialsManagement userId={user.id} />
           <TimeTracking />
         </Tabs>
       </div>

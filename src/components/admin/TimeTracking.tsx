@@ -546,8 +546,8 @@ export default function TimeTracking() {
                                 step="0.5"
                                 min="0"
                                 max="24"
-                                value={hours || ''}
-                                onChange={(e) => handleHoursChange(user.user_id, dateStr, e.target.value, record?.comment || '')}
+                                defaultValue={hours || ''}
+                                onBlur={(e) => handleHoursChange(user.user_id, dateStr, e.target.value, record?.comment || '')}
                                 className={cn('border-0 text-center h-8 text-xs', isWeekend && 'bg-gray-50')}
                                 placeholder="-"
                               />

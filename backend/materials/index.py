@@ -36,8 +36,23 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if method == 'GET':
             resource_id = params.get('id')
             section_id = params.get('section_id')
+            user_id = event.get('headers', {}).get('x-user-id')
             
             if resource_type == 'section':
+                # Проверяем права доступа
+                if user_id:
+                    cur.execute("SELECT role FROM users WHERE id = %s", (user_id,))
+                    user_row = cur.fetchone()
+                    if not user_row or user_row['role'] not in ['admin', 'supervisor']:
+                        cur.close()
+                        conn.close()
+                        return {
+                            'statusCode': 403,
+                            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                            'body': json.dumps({'error': 'Доступ запрещен'}),
+                            'isBase64Encoded': False
+                        }
+                
                 if resource_id:
                     cur.execute("SELECT * FROM sections WHERE id = %s", (resource_id,))
                     result = dict(cur.fetchone()) if cur.rowcount > 0 else None
@@ -97,6 +112,22 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         elif method == 'POST':
             body_data = json.loads(event.get('body', '{}'))
+            user_id = event.get('headers', {}).get('x-user-id')
+            
+            # Проверяем права для создания разделов и цветов
+            if resource_type in ['section', 'color']:
+                if user_id:
+                    cur.execute("SELECT role FROM users WHERE id = %s", (user_id,))
+                    user_row = cur.fetchone()
+                    if not user_row or user_row['role'] not in ['admin', 'supervisor']:
+                        cur.close()
+                        conn.close()
+                        return {
+                            'statusCode': 403,
+                            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                            'body': json.dumps({'error': 'Доступ запрещен'}),
+                            'isBase64Encoded': False
+                        }
             
             if resource_type == 'section':
                 name = body_data.get('name')
@@ -176,6 +207,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         elif method == 'PUT':
             body_data = json.loads(event.get('body', '{}'))
             resource_id = body_data.get('id')
+            user_id = event.get('headers', {}).get('x-user-id')
             
             if not resource_id:
                 return {
@@ -184,6 +216,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'body': json.dumps({'error': 'ID обязателен'}),
                     'isBase64Encoded': False
                 }
+            
+            # Проверяем права для редактирования разделов и цветов
+            if resource_type in ['section', 'color']:
+                if user_id:
+                    cur.execute("SELECT role FROM users WHERE id = %s", (user_id,))
+                    user_row = cur.fetchone()
+                    if not user_row or user_row['role'] not in ['admin', 'supervisor']:
+                        cur.close()
+                        conn.close()
+                        return {
+                            'statusCode': 403,
+                            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                            'body': json.dumps({'error': 'Доступ запрещен'}),
+                            'isBase64Encoded': False
+                        }
             
             if resource_type == 'section':
                 name = body_data.get('name')
@@ -261,6 +308,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         elif method == 'DELETE':
             resource_id = params.get('id')
+            user_id = event.get('headers', {}).get('x-user-id')
             
             if not resource_id:
                 return {
@@ -269,6 +317,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'body': json.dumps({'error': 'ID обязателен'}),
                     'isBase64Encoded': False
                 }
+            
+            # Проверяем права для удаления разделов и цветов
+            if resource_type in ['section', 'color']:
+                if user_id:
+                    cur.execute("SELECT role FROM users WHERE id = %s", (user_id,))
+                    user_row = cur.fetchone()
+                    if not user_row or user_row['role'] not in ['admin', 'supervisor']:
+                        cur.close()
+                        conn.close()
+                        return {
+                            'statusCode': 403,
+                            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                            'body': json.dumps({'error': 'Доступ запрещен'}),
+                            'isBase64Encoded': False
+                        }
             
             if resource_type == 'section':
                 cur.execute("DELETE FROM sections WHERE id = %s", (resource_id,))

@@ -30,7 +30,11 @@ interface Section {
   name: string;
 }
 
-export default function MaterialsManagement() {
+interface MaterialsManagementProps {
+  userId: number;
+}
+
+export default function MaterialsManagement({ userId }: MaterialsManagementProps) {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -60,7 +64,9 @@ export default function MaterialsManagement() {
 
   const loadSections = async () => {
     try {
-      const response = await fetch(`${API}?type=section`);
+      const response = await fetch(`${API}?type=section`, {
+        headers: { 'X-User-Id': String(userId) }
+      });
       const data = await response.json();
       setSections(data);
     } catch (error) {

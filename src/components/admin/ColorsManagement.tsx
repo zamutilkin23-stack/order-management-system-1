@@ -17,7 +17,11 @@ interface Color {
   hex_code: string;
 }
 
-export default function ColorsManagement() {
+interface ColorsManagementProps {
+  userId: number;
+}
+
+export default function ColorsManagement({ userId }: ColorsManagementProps) {
   const [colors, setColors] = useState<Color[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', hex_code: '#000000' });
@@ -28,7 +32,9 @@ export default function ColorsManagement() {
 
   const loadColors = async () => {
     try {
-      const response = await fetch(`${API}?type=color`);
+      const response = await fetch(`${API}?type=color`, {
+        headers: { 'X-User-Id': String(userId) }
+      });
       const data = await response.json();
       setColors(data);
     } catch (error) {
@@ -45,7 +51,10 @@ export default function ColorsManagement() {
     try {
       const response = await fetch(`${API}?type=color`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-User-Id': String(userId)
+        },
         body: JSON.stringify(formData)
       });
 
@@ -64,7 +73,10 @@ export default function ColorsManagement() {
     if (!confirm('Удалить цвет?')) return;
 
     try {
-      const response = await fetch(`${API}?type=color&id=${id}`, { method: 'DELETE' });
+      const response = await fetch(`${API}?type=color&id=${id}`, { 
+        method: 'DELETE',
+        headers: { 'X-User-Id': String(userId) }
+      });
       if (response.ok) {
         toast.success('Цвет удален');
         loadColors();

@@ -16,7 +16,11 @@ interface Section {
   name: string;
 }
 
-export default function SectionsManagement() {
+interface SectionsManagementProps {
+  userId: number;
+}
+
+export default function SectionsManagement({ userId }: SectionsManagementProps) {
   const [sections, setSections] = useState<Section[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState('');
@@ -27,7 +31,9 @@ export default function SectionsManagement() {
 
   const loadSections = async () => {
     try {
-      const response = await fetch(`${API}?type=section`);
+      const response = await fetch(`${API}?type=section`, {
+        headers: { 'X-User-Id': String(userId) }
+      });
       const data = await response.json();
       setSections(data);
     } catch (error) {
@@ -44,7 +50,10 @@ export default function SectionsManagement() {
     try {
       const response = await fetch(`${API}?type=section`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-User-Id': String(userId)
+        },
         body: JSON.stringify({ name })
       });
 
@@ -63,7 +72,10 @@ export default function SectionsManagement() {
     if (!confirm('Удалить раздел?')) return;
 
     try {
-      const response = await fetch(`${API}?type=section&id=${id}`, { method: 'DELETE' });
+      const response = await fetch(`${API}?type=section&id=${id}`, { 
+        method: 'DELETE',
+        headers: { 'X-User-Id': String(userId) }
+      });
       if (response.ok) {
         toast.success('Раздел удален');
         loadSections();
