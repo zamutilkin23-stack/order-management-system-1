@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
@@ -66,6 +67,31 @@ export default function WorkerSchedule({ userId, userName, scheduleApi }: Worker
   const getTotalHours = () => {
     if (!timesheet) return 0;
     return Object.values(timesheet.days).reduce((sum, record) => sum + (record?.hours || 0), 0);
+  };
+
+  const handleHoursChange = async (dateStr: string, hours: string, comment: string = '') => {
+    const hoursNum = parseFloat(hours) || 0;
+    
+    try {
+      const response = await fetch(scheduleApi, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          work_date: dateStr,
+          hours: hoursNum,
+          comment
+        })
+      });
+
+      if (response.ok) {
+        loadTimesheet();
+      } else {
+        toast.error('Ошибка обновления');
+      }
+    } catch (error) {
+      toast.error('Ошибка сервера');
+    }
   };
 
   const daysInMonth = getDaysInMonth();
@@ -147,15 +173,25 @@ export default function WorkerSchedule({ userId, userName, scheduleApi }: Worker
                         {day} {new Date(dateStr).toLocaleString('ru', { weekday: 'short' })}
                       </td>
                       <td className="border p-2 text-center">
-                        <span className={cn(
-                          'px-3 py-1 rounded-full font-medium',
-                          hours > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                        )}>
-                          {hours > 0 ? hours : '-'}
-                        </span>
+                        <Input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          max="24"
+                          value={hours || ''}
+                          onChange={(e) => handleHoursChange(dateStr, e.target.value, record?.comment || '')}
+                          className="w-20 text-center mx-auto"
+                          placeholder="0"
+                        />
                       </td>
                       <td className="border p-2 text-sm text-gray-600">
-                        {record?.comment || '-'}
+                        <Input
+                          type="text"
+                          value={record?.comment || ''}
+                          onChange={(e) => handleHoursChange(dateStr, String(hours), e.target.value)}
+                          className="text-sm"
+                          placeholder="Комментарий"
+                        />
                       </td>
                     </tr>
                   );

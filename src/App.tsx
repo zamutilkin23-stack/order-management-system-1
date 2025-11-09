@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import LoginPage from './pages/LoginPage';
 import AdminPanel from './pages/AdminPanel';
 import ManagerPanel from './pages/ManagerPanel';
+import SupervisorPanel from './pages/SupervisorPanel';
 import WorkerPanel from './pages/WorkerPanel';
 
 const queryClient = new QueryClient();
@@ -44,8 +45,9 @@ const App = () => {
       case 'admin':
         return <AdminPanel user={user} onLogout={handleLogout} />;
       case 'manager':
-      case 'supervisor':
         return <ManagerPanel user={user} onLogout={handleLogout} />;
+      case 'supervisor':
+        return <SupervisorPanel user={user} onLogout={handleLogout} />;
       case 'worker':
         return <WorkerPanel user={user} onLogout={handleLogout} />;
       default:
