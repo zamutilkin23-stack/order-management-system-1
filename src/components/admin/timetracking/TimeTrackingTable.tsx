@@ -136,7 +136,9 @@ export default function TimeTrackingTable({
                             }
                           }}
                           onBlur={(e) => {
-                            if (e.target.value !== String(record?.hours || '')) {
+                            const newValue = parseFloat(e.target.value) || 0;
+                            const oldValue = record?.hours || 0;
+                            if (newValue !== oldValue) {
                               onHoursChange(user.user_id, dateStr, e.target.value);
                             }
                           }}

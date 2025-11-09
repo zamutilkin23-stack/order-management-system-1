@@ -199,7 +199,9 @@ export default function WorkerSchedule({ userId, userName, scheduleApi }: Worker
                             }
                           }}
                           onBlur={(e) => {
-                            if (e.target.value !== String(record?.hours || '')) {
+                            const newValue = parseFloat(e.target.value) || 0;
+                            const oldValue = record?.hours || 0;
+                            if (newValue !== oldValue) {
                               handleHoursChange(dateStr, e.target.value);
                             }
                           }}

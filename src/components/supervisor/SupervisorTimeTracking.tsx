@@ -42,6 +42,7 @@ export default function SupervisorTimeTracking({ userId, userName }: SupervisorT
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(false);
   const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set());
+  const [activeTab, setActiveTab] = useState('all');
 
   useEffect(() => {
     loadUsers();
@@ -372,7 +373,12 @@ export default function SupervisorTimeTracking({ userId, userName }: SupervisorT
 
   return (
     <Card>
-      <Tabs defaultValue="all">
+      <Tabs defaultValue="all" value={activeTab} onValueChange={(value) => {
+        setActiveTab(value);
+        if (value === 'all' && users.length > 0) {
+          loadTimesheet();
+        }
+      }}>
         <div className="p-4 border-b">
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="all">
