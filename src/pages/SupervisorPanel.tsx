@@ -1,9 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
-import WorkSchedule from '@/components/manager/WorkSchedule';
-
-const SCHEDULE_API = 'https://functions.poehali.dev/f617714b-d72a-41e1-87ec-519f6dff2f28';
+import TimeTracking from '@/components/admin/TimeTracking';
 
 interface User {
   id: number;
@@ -43,14 +41,14 @@ export default function SupervisorPanel({ user, onLogout }: SupervisorPanelProps
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Icon name="Calendar" size={20} />
-              График работы сотрудников
+              Табель учета рабочего времени
             </CardTitle>
             <CardDescription>
-              Просмотр табеля учета рабочего времени (только чтение)
+              Внесение и редактирование часов для всех работников
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <WorkSchedule scheduleApi={SCHEDULE_API} />
+            <TimeTracking />
           </CardContent>
         </Card>
       </div>

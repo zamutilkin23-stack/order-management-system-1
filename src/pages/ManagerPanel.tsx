@@ -204,14 +204,10 @@ export default function ManagerPanel({ user, onLogout }: ManagerPanelProps) {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="orders" className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4">
+          <TabsList className="grid w-full max-w-xl grid-cols-3">
             <TabsTrigger value="orders">
               <Icon name="ClipboardList" size={16} className="mr-2" />
               Заявки
-            </TabsTrigger>
-            <TabsTrigger value="sections">
-              <Icon name="FolderTree" size={16} className="mr-2" />
-              Разделы
             </TabsTrigger>
             <TabsTrigger value="inventory">
               <Icon name="Package" size={16} className="mr-2" />
@@ -234,34 +230,6 @@ export default function ManagerPanel({ user, onLogout }: ManagerPanelProps) {
             onRefresh={loadOrders}
           />
 
-          <TabsContent value="sections">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {sections.map((section) => {
-                const sectionMaterials = materials.filter(m => m.section_id === section.id);
-                return (
-                  <div key={section.id} className="bg-white rounded-lg border p-6 hover:shadow-lg transition-shadow">
-                    <h3 className="text-lg font-bold mb-2">{section.name}</h3>
-                    <p className="text-sm text-gray-600">
-                      {sectionMaterials.length} материалов
-                    </p>
-                    <div className="mt-4 space-y-1">
-                      {sectionMaterials.slice(0, 3).map((mat) => (
-                        <div key={mat.id} className="text-xs text-gray-500 truncate">
-                          • {mat.name}
-                        </div>
-                      ))}
-                      {sectionMaterials.length > 3 && (
-                        <div className="text-xs text-gray-400">
-                          +{sectionMaterials.length - 3} еще...
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </TabsContent>
-
           <MaterialsInventory
             materials={materials}
             sections={sections}
@@ -269,11 +237,7 @@ export default function ManagerPanel({ user, onLogout }: ManagerPanelProps) {
             onRefresh={loadMaterials}
           />
 
-          <WorkSchedule
-            userId={user.id}
-            userRole={user.role}
-            scheduleApi={SCHEDULE_API}
-          />
+          <WorkSchedule scheduleApi={SCHEDULE_API} />
         </Tabs>
       </div>
     </div>
