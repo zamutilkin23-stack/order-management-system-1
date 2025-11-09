@@ -69,7 +69,7 @@ export default function WorkerSchedule({ userId, userName, scheduleApi }: Worker
     return Object.values(timesheet.days).reduce((sum, record) => sum + (record?.hours || 0), 0);
   };
 
-  const handleHoursChange = async (dateStr: string, hours: string, comment: string = '') => {
+  const handleHoursChange = async (dateStr: string, hours: string) => {
     const hoursNum = parseFloat(hours) || 0;
     
     try {
@@ -80,12 +80,13 @@ export default function WorkerSchedule({ userId, userName, scheduleApi }: Worker
           user_id: userId,
           work_date: dateStr,
           hours: hoursNum,
-          comment
+          comment: ''
         })
       });
 
       if (response.ok) {
-        loadTimesheet();
+        await loadTimesheet();
+        toast.success('Часы обновлены');
       } else {
         toast.error('Ошибка обновления');
       }
@@ -156,7 +157,6 @@ export default function WorkerSchedule({ userId, userName, scheduleApi }: Worker
                 <tr className="bg-gray-50">
                   <th className="border p-2 text-center">День</th>
                   <th className="border p-2 text-center">Часов</th>
-                  <th className="border p-2 text-left">Комментарий</th>
                 </tr>
               </thead>
               <tbody>
@@ -179,18 +179,33 @@ export default function WorkerSchedule({ userId, userName, scheduleApi }: Worker
                           min="0"
                           max="24"
                           value={hours || ''}
-                          onChange={(e) => handleHoursChange(dateStr, e.target.value, record?.comment || '')}
+                          onChange={(e) => {
+                            if (timesheet) {
+                              setTimesheet({
+                                ...timesheet,
+                                days: {
+                                  ...timesheet.days,
+                                  [dateStr]: {
+                                    hours: parseFloat(e.target.value) || 0,
+                                    comment: '',
+                                    record_id: record?.record_id || null
+                                  }
+                                }
+                              });
+                            }
+                          }}
+                          onBlur={(e) => {
+                            if (e.target.value !== String(record?.hours || '')) {
+                              handleHoursChange(dateStr, e.target.value);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.currentTarget.blur();
+                            }
+                          }}
                           className="w-20 text-center mx-auto"
                           placeholder="0"
-                        />
-                      </td>
-                      <td className="border p-2 text-sm text-gray-600">
-                        <Input
-                          type="text"
-                          value={record?.comment || ''}
-                          onChange={(e) => handleHoursChange(dateStr, String(hours), e.target.value)}
-                          className="text-sm"
-                          placeholder="Комментарий"
                         />
                       </td>
                     </tr>
@@ -201,7 +216,6 @@ export default function WorkerSchedule({ userId, userName, scheduleApi }: Worker
                 <tr className="bg-gray-100 font-bold">
                   <td className="border p-2 text-center">Итого:</td>
                   <td className="border p-2 text-center text-blue-600">{totalHours}</td>
-                  <td className="border p-2"></td>
                 </tr>
               </tfoot>
             </table>

@@ -81,7 +81,7 @@ export default function TimeTracking() {
     return new Date(dateStr) <= new Date(firedAt);
   };
 
-  const handleHoursChange = async (userId: number, dateStr: string, hours: string, comment: string = '') => {
+  const handleHoursChange = async (userId: number, dateStr: string, hours: string) => {
     const hoursNum = parseFloat(hours) || 0;
     
     try {
@@ -92,12 +92,13 @@ export default function TimeTracking() {
           user_id: userId,
           work_date: dateStr,
           hours: hoursNum,
-          comment
+          comment: ''
         })
       });
 
       if (response.ok) {
-        loadTimesheet();
+        await loadTimesheet();
+        toast.success('Часы обновлены');
       } else {
         toast.error('Ошибка обновления');
       }
@@ -546,8 +547,29 @@ export default function TimeTracking() {
                                 step="0.5"
                                 min="0"
                                 max="24"
-                                defaultValue={hours || ''}
-                                onBlur={(e) => handleHoursChange(user.user_id, dateStr, e.target.value, record?.comment || '')}
+                                value={hours || ''}
+                                onChange={(e) => {
+                                  const newTimesheet = [...timesheet];
+                                  const userIndex = newTimesheet.findIndex(u => u.user_id === user.user_id);
+                                  if (userIndex !== -1) {
+                                    newTimesheet[userIndex].days[dateStr] = {
+                                      hours: parseFloat(e.target.value) || 0,
+                                      comment: '',
+                                      record_id: record?.record_id || null
+                                    };
+                                    setTimesheet(newTimesheet);
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  if (e.target.value !== String(record?.hours || '')) {
+                                    handleHoursChange(user.user_id, dateStr, e.target.value);
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.currentTarget.blur();
+                                  }
+                                }}
                                 className={cn('border-0 text-center h-8 text-xs', isWeekend && 'bg-gray-50')}
                                 placeholder="-"
                               />
