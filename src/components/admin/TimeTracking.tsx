@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
 import { TabsContent } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import Icon from '@/components/ui/icon';
+import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import TimeTrackingHeader from './timetracking/TimeTrackingHeader';
+import TimeTrackingBulkActions from './timetracking/TimeTrackingBulkActions';
+import TimeTrackingTable from './timetracking/TimeTrackingTable';
 
 const SCHEDULE_API = 'https://functions.poehali.dev/f617714b-d72a-41e1-87ec-519f6dff2f28';
 const USERS_API = 'https://functions.poehali.dev/cb1be1e9-7f80-4e10-8f1f-4327a0daae82';
@@ -382,210 +380,33 @@ export default function TimeTracking() {
   return (
     <TabsContent value="timetracking" className="space-y-4">
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Icon name="Clock" size={20} />
-              Учет рабочего времени
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                    <SelectItem key={m} value={String(m)}>
-                      {new Date(2000, m - 1).toLocaleString('ru', { month: 'long' })}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
-                <SelectTrigger className="w-24">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[2024, 2025, 2026].map(y => (
-                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm" onClick={loadTimesheet} disabled={loading}>
-                <Icon name="RefreshCw" size={16} className={cn(loading && 'animate-spin')} />
-              </Button>
-              <Button variant="outline" size="sm" onClick={handlePrint}>
-                <Icon name="Printer" size={16} className="mr-2" />
-                Печать
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
+        <TimeTrackingHeader
+          selectedMonth={selectedMonth}
+          selectedYear={selectedYear}
+          loading={loading}
+          onMonthChange={setSelectedMonth}
+          onYearChange={setSelectedYear}
+          onRefresh={loadTimesheet}
+          onPrint={handlePrint}
+        />
         <CardContent>
-          <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-start gap-2">
-              <Icon name="Info" size={16} className="text-blue-600 mt-0.5" />
-              <div className="text-xs text-gray-700">
-                <strong>Возможности табеля:</strong>
-                <ul className="mt-1 space-y-1 ml-2">
-                  <li>• Кнопки у каждого сотрудника: заполнить месяц (8ч), установить свои часы, очистить</li>
-                  <li>• Быстрые действия для всех сотрудников по неделям ниже</li>
-                  <li>• Выходные дни выделены серым фоном</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-          <div className="mb-3 flex gap-2 flex-wrap items-center">
-            <div className="text-xs font-medium text-gray-700">Быстрые действия для всех:</div>
-            {[1, 8, 15, 22].map(startDay => {
-              const weekNum = Math.ceil(startDay / 7);
-              return (
-                <div key={startDay} className="flex gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => {
-                      timesheet.forEach(user => handleFillWeekRange(user.user_id, startDay));
-                    }}
-                  >
-                    Заполнить {weekNum} неделю
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs text-red-600"
-                    onClick={() => {
-                      if (window.confirm(`Очистить ${weekNum} неделю для всех сотрудников?`)) {
-                        timesheet.forEach(user => handleClearWeekRange(user.user_id, startDay));
-                      }
-                    }}
-                  >
-                    Очистить {weekNum}
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-xs">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="border p-2 text-left sticky left-0 bg-gray-50 min-w-[150px]">ФИО</th>
-                  {days.map(day => {
-                    const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    const dayOfWeek = new Date(dateStr).getDay();
-                    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                    return (
-                      <th key={day} className={cn('border p-1 text-center min-w-[50px]', isWeekend && 'bg-gray-200')}>
-                        {day}
-                        <div className="text-[8px] text-gray-500">
-                          {['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'][dayOfWeek]}
-                        </div>
-                      </th>
-                    );
-                  })}
-                  <th className="border p-2 text-center min-w-[70px]">Итого</th>
-                </tr>
-              </thead>
-              <tbody>
-                {timesheet.map(user => {
-                  let totalHours = 0;
-                  return (
-                    <tr key={user.user_id} className="hover:bg-gray-50">
-                      <td className="border p-2 font-medium sticky left-0 bg-white">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-xs">{user.full_name}</span>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-1"
-                              onClick={() => handleFillMonth(user.user_id)}
-                              title="Заполнить месяц по 8ч (пн-пт)"
-                            >
-                              <Icon name="CalendarPlus" size={12} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-1"
-                              onClick={() => handleBulkEdit(user.user_id)}
-                              title="Установить свое количество часов"
-                            >
-                              <Icon name="Edit3" size={12} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-1 text-red-600 hover:text-red-700"
-                              onClick={() => handleClearMonth(user.user_id)}
-                              title="Очистить месяц"
-                            >
-                              <Icon name="Trash2" size={12} />
-                            </Button>
-                          </div>
-                        </div>
-                      </td>
-                      {days.map(day => {
-                        const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                        const record = user.days[dateStr];
-                        const hours = record?.hours || 0;
-                        const isFired = !isDateBeforeFired(dateStr, user.fired_at);
-                        const dayOfWeek = new Date(dateStr).getDay();
-                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                        
-                        if (!isFired) {
-                          totalHours += hours;
-                        }
-
-                        return (
-                          <td key={day} className={cn('border p-0', isFired && 'bg-gray-100', isWeekend && !isFired && 'bg-gray-50')}>
-                            {!isFired ? (
-                              <Input
-                                type="number"
-                                step="0.5"
-                                min="0"
-                                max="24"
-                                value={hours || ''}
-                                onChange={(e) => {
-                                  const newTimesheet = [...timesheet];
-                                  const userIndex = newTimesheet.findIndex(u => u.user_id === user.user_id);
-                                  if (userIndex !== -1) {
-                                    newTimesheet[userIndex].days[dateStr] = {
-                                      hours: parseFloat(e.target.value) || 0,
-                                      comment: '',
-                                      record_id: record?.record_id || null
-                                    };
-                                    setTimesheet(newTimesheet);
-                                  }
-                                }}
-                                onBlur={(e) => {
-                                  if (e.target.value !== String(record?.hours || '')) {
-                                    handleHoursChange(user.user_id, dateStr, e.target.value);
-                                  }
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.currentTarget.blur();
-                                  }
-                                }}
-                                className={cn('border-0 text-center h-8 text-xs', isWeekend && 'bg-gray-50')}
-                                placeholder="-"
-                              />
-                            ) : (
-                              <div className="h-8 flex items-center justify-center text-gray-400">-</div>
-                            )}
-                          </td>
-                        );
-                      })}
-                      <td className="border p-2 text-center font-bold bg-gray-50">{totalHours}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <TimeTrackingBulkActions
+            timesheet={timesheet}
+            onFillWeekRange={handleFillWeekRange}
+            onClearWeekRange={handleClearWeekRange}
+          />
+          <TimeTrackingTable
+            timesheet={timesheet}
+            selectedMonth={selectedMonth}
+            selectedYear={selectedYear}
+            days={days}
+            isDateBeforeFired={isDateBeforeFired}
+            onHoursChange={handleHoursChange}
+            onFillMonth={handleFillMonth}
+            onBulkEdit={handleBulkEdit}
+            onClearMonth={handleClearMonth}
+            setTimesheet={setTimesheet}
+          />
         </CardContent>
       </Card>
     </TabsContent>
