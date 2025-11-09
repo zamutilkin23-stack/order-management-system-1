@@ -47,50 +47,56 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 
                 if user_id:
                     cur.execute(
-                        """SELECT u.id as user_id, u.full_name, u.fired_at,
-                           tt.work_date, COALESCE(tt.hours, 0) as hours, tt.comment, tt.id as record_id
-                           FROM users u
-                           LEFT JOIN time_tracking tt ON u.id = tt.user_id 
-                               AND tt.work_date >= %s::date 
-                               AND tt.work_date < %s::date
-                           WHERE u.id = %s
-                           AND u.role IN ('worker', 'supervisor')
-                           ORDER BY tt.work_date""",
-                        (start_date, end_date, user_id)
+                        """SELECT id, full_name, fired_at
+                           FROM users
+                           WHERE id = %s
+                           AND role IN ('worker', 'supervisor')""",
+                        (user_id,)
                     )
                 else:
                     cur.execute(
-                        """SELECT u.id as user_id, u.full_name, u.fired_at,
-                           tt.work_date, COALESCE(tt.hours, 0) as hours, tt.comment, tt.id as record_id
-                           FROM users u
-                           LEFT JOIN time_tracking tt ON u.id = tt.user_id 
-                               AND tt.work_date >= %s::date 
-                               AND tt.work_date < %s::date
-                           WHERE u.role IN ('worker', 'supervisor')
-                           AND u.status = 'active'
-                           ORDER BY u.full_name, tt.work_date""",
-                        (start_date, end_date)
+                        """SELECT id, full_name, fired_at
+                           FROM users
+                           WHERE role IN ('worker', 'supervisor')
+                           AND status = 'active'
+                           ORDER BY full_name"""
                     )
                 
-                records = cur.fetchall()
-                
+                users = cur.fetchall()
                 users_map = {}
-                for row in records:
-                    uid = row['user_id']
-                    if uid not in users_map:
-                        users_map[uid] = {
-                            'user_id': uid,
-                            'full_name': row['full_name'],
-                            'fired_at': row['fired_at'],
-                            'days': {}
-                        }
+                
+                for user in users:
+                    uid = user['id']
+                    users_map[uid] = {
+                        'user_id': uid,
+                        'full_name': user['full_name'],
+                        'fired_at': user['fired_at'],
+                        'days': {}
+                    }
+                
+                if users_map:
+                    user_ids = list(users_map.keys())
+                    placeholders = ','.join(['%s'] * len(user_ids))
                     
-                    if row['work_date']:
-                        day_key = row['work_date'].strftime('%Y-%m-%d')
+                    cur.execute(
+                        f"""SELECT user_id, work_date, hours, comment, id as record_id
+                            FROM time_tracking
+                            WHERE user_id IN ({placeholders})
+                            AND work_date >= %s::date
+                            AND work_date < %s::date
+                            ORDER BY work_date""",
+                        (*user_ids, start_date, end_date)
+                    )
+                    
+                    time_records = cur.fetchall()
+                    
+                    for record in time_records:
+                        uid = record['user_id']
+                        day_key = record['work_date'].strftime('%Y-%m-%d')
                         users_map[uid]['days'][day_key] = {
-                            'hours': float(row['hours']),
-                            'comment': row['comment'],
-                            'record_id': row['record_id']
+                            'hours': float(record['hours']),
+                            'comment': record['comment'],
+                            'record_id': record['record_id']
                         }
                 
                 result = list(users_map.values())
