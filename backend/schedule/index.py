@@ -50,14 +50,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         """SELECT id, full_name, fired_at
                            FROM users
                            WHERE id = %s
-                           AND role IN ('worker', 'supervisor')""",
+                           AND role = 'worker'""",
                         (user_id,)
                     )
                 else:
                     cur.execute(
                         """SELECT id, full_name, fired_at
                            FROM users
-                           WHERE role IN ('worker', 'supervisor')
+                           WHERE role = 'worker'
                            AND status = 'active'
                            ORDER BY full_name"""
                     )
@@ -106,7 +106,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     """SELECT tt.*, u.full_name, u.role, u.fired_at
                        FROM time_tracking tt 
                        JOIN users u ON tt.user_id = u.id 
-                       WHERE u.role IN ('worker', 'supervisor')
+                       WHERE u.role = 'worker'
                        ORDER BY tt.work_date DESC 
                        LIMIT 100"""
                 )

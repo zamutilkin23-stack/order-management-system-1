@@ -56,7 +56,7 @@ export default function WorkSchedule({ userId, userRole, scheduleApi }: WorkSche
     try {
       const response = await fetch(USERS_API);
       const data = await response.json();
-      const workers = data.filter((u: any) => ['worker', 'supervisor'].includes(u.role));
+      const workers = data.filter((u: any) => u.role === 'worker');
       setUsers(workers);
     } catch (error) {
       toast.error('Ошибка загрузки пользователей');

@@ -51,7 +51,7 @@ export default function TimeTracking() {
     try {
       const response = await fetch(USERS_API);
       const data = await response.json();
-      const workers = data.filter((u: any) => ['worker', 'supervisor'].includes(u.role));
+      const workers = data.filter((u: any) => u.role === 'worker');
       setUsers(workers);
     } catch (error) {
       toast.error('Ошибка загрузки пользователей');
@@ -96,13 +96,80 @@ export default function TimeTracking() {
       });
 
       if (response.ok) {
-        toast.success('Часы обновлены');
         loadTimesheet();
       } else {
         toast.error('Ошибка обновления');
       }
     } catch (error) {
       toast.error('Ошибка сервера');
+    }
+  };
+
+  const handleFillWeek = async (userId: number, startDay: number) => {
+    const promises = [];
+    for (let i = 0; i < 5; i++) {
+      const day = startDay + i;
+      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dayOfWeek = new Date(dateStr).getDay();
+      
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        promises.push(
+          fetch(SCHEDULE_API, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: userId,
+              work_date: dateStr,
+              hours: 8,
+              comment: ''
+            })
+          })
+        );
+      }
+    }
+
+    try {
+      await Promise.all(promises);
+      toast.success('Неделя заполнена');
+      loadTimesheet();
+    } catch (error) {
+      toast.error('Ошибка заполнения');
+    }
+  };
+
+  const handleFillMonth = async (userId: number) => {
+    const daysInMonth = getDaysInMonth();
+    const promises = [];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dayOfWeek = new Date(dateStr).getDay();
+      
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        promises.push(
+          fetch(SCHEDULE_API, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: userId,
+              work_date: dateStr,
+              hours: 8,
+              comment: ''
+            })
+          })
+        );
+      }
+    }
+
+    try {
+      setLoading(true);
+      await Promise.all(promises);
+      toast.success('Месяц заполнен');
+      loadTimesheet();
+    } catch (error) {
+      toast.error('Ошибка заполнения');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -225,7 +292,22 @@ export default function TimeTracking() {
                   let totalHours = 0;
                   return (
                     <tr key={user.user_id} className="hover:bg-gray-50">
-                      <td className="border p-2 font-medium sticky left-0 bg-white">{user.full_name}</td>
+                      <td className="border p-2 font-medium sticky left-0 bg-white">
+                        <div className="flex items-center justify-between gap-2">
+                          <span>{user.full_name}</span>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => handleFillMonth(user.user_id)}
+                              title="Заполнить месяц по 8ч (пн-пт)"
+                            >
+                              <Icon name="CalendarDays" size={12} />
+                            </Button>
+                          </div>
+                        </div>
+                      </td>
                       {days.map(day => {
                         const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                         const record = user.days[dateStr];
