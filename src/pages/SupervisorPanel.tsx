@@ -1,7 +1,10 @@
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import TimeTracking from '@/components/admin/TimeTracking';
+import SectionsManagement from '@/components/admin/SectionsManagement';
+import ColorsManagement from '@/components/admin/ColorsManagement';
+import MaterialsManagement from '@/components/admin/MaterialsManagement';
 
 interface User {
   id: number;
@@ -37,20 +40,31 @@ export default function SupervisorPanel({ user, onLogout }: SupervisorPanelProps
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Icon name="Calendar" size={20} />
-              Табель учета рабочего времени
-            </CardTitle>
-            <CardDescription>
-              Внесение и редактирование часов для всех работников
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TimeTracking />
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="timetracking" className="space-y-6">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
+            <TabsTrigger value="timetracking">
+              <Icon name="Clock" size={16} className="mr-2" />
+              Табель
+            </TabsTrigger>
+            <TabsTrigger value="sections">
+              <Icon name="FolderTree" size={16} className="mr-2" />
+              Разделы
+            </TabsTrigger>
+            <TabsTrigger value="colors">
+              <Icon name="Palette" size={16} className="mr-2" />
+              Цвета
+            </TabsTrigger>
+            <TabsTrigger value="materials">
+              <Icon name="Package" size={16} className="mr-2" />
+              Материалы
+            </TabsTrigger>
+          </TabsList>
+
+          <TimeTracking />
+          <SectionsManagement userId={user.id} />
+          <ColorsManagement userId={user.id} />
+          <MaterialsManagement userId={user.id} />
+        </Tabs>
       </div>
     </div>
   );
