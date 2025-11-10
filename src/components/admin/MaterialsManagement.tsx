@@ -28,6 +28,7 @@ interface Material {
 interface Section {
   id: number;
   name: string;
+  parent_id: number | null;
 }
 
 interface MaterialsManagementProps {
@@ -38,6 +39,7 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
   const [materials, setMaterials] = useState<Material[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedSectionFilter, setSelectedSectionFilter] = useState<string>('all');
   const [formData, setFormData] = useState({
     name: '',
     section_id: '',
@@ -113,8 +115,35 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
   };
 
   const getSectionName = (id: number) => {
-    return sections.find(s => s.id === id)?.name || '—';
+    const section = sections.find(s => s.id === id);
+    if (!section) return '—';
+    
+    const parent = sections.find(s => s.id === section.parent_id);
+    if (parent) {
+      return `${parent.name} → ${section.name}`;
+    }
+    return section.name;
   };
+
+  const getFilteredMaterials = () => {
+    if (selectedSectionFilter === 'all') return materials;
+    
+    const filterId = Number(selectedSectionFilter);
+    const childSections = sections.filter(s => s.parent_id === filterId).map(s => s.id);
+    const allSectionIds = [filterId, ...childSections];
+    
+    return materials.filter(m => allSectionIds.includes(m.section_id));
+  };
+
+  const getSectionHierarchy = () => {
+    const parentSections = sections.filter(s => !s.parent_id);
+    return parentSections.map(parent => ({
+      ...parent,
+      children: sections.filter(s => s.parent_id === parent.id)
+    }));
+  };
+
+  const filteredMaterials = getFilteredMaterials();
 
   return (
     <TabsContent value="materials">
@@ -125,7 +154,26 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
               <CardTitle>Материалы</CardTitle>
               <CardDescription>Управление материалами и остатками</CardDescription>
             </div>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <div className="flex items-center gap-2">
+              <Select value={selectedSectionFilter} onValueChange={setSelectedSectionFilter}>
+                <SelectTrigger className="w-64">
+                  <SelectValue placeholder="Все разделы" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все разделы</SelectItem>
+                  {getSectionHierarchy().flatMap(parent => [
+                    <SelectItem key={parent.id} value={String(parent.id)}>
+                      <span className="font-semibold">{parent.name}</span>
+                    </SelectItem>,
+                    ...parent.children.map(child => (
+                      <SelectItem key={child.id} value={String(child.id)}>
+                        <span className="ml-4">↳ {child.name}</span>
+                      </SelectItem>
+                    ))
+                  ])}
+                </SelectContent>
+              </Select>
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button>
                   <Icon name="Plus" size={16} className="mr-2" />
@@ -148,9 +196,16 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
                         <SelectValue placeholder="Выберите раздел" />
                       </SelectTrigger>
                       <SelectContent>
-                        {sections.map(s => (
-                          <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                        ))}
+                        {getSectionHierarchy().flatMap(parent => [
+                          <SelectItem key={parent.id} value={String(parent.id)}>
+                            <span className="font-semibold">{parent.name}</span>
+                          </SelectItem>,
+                          ...parent.children.map(child => (
+                            <SelectItem key={child.id} value={String(child.id)}>
+                              <span className="ml-4">↳ {child.name}</span>
+                            </SelectItem>
+                          ))
+                        ])}
                       </SelectContent>
                     </Select>
                   </div>
@@ -190,7 +245,14 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
               </TableRow>
             </TableHeader>
             <TableBody>
-              {materials.map((material) => (
+              {filteredMaterials.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-gray-500 py-8">
+                    Материалы не найдены
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredMaterials.map((material) => (
                 <TableRow key={material.id} className={cn(material.quantity < 10 && 'bg-red-50')}>
                   <TableCell className="font-medium">{material.name}</TableCell>
                   <TableCell>{getSectionName(material.section_id)}</TableCell>
@@ -210,7 +272,7 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
+              )))}
             </TableBody>
           </Table>
         </CardContent>

@@ -17,6 +17,7 @@ interface Material {
 interface Section {
   id: number;
   name: string;
+  parent_id: number | null;
 }
 
 interface Color {
@@ -57,6 +58,14 @@ export default function SectionsView() {
     return materials.filter(m => m.section_id === sectionId);
   };
 
+  const getParentSections = () => {
+    return sections.filter(s => !s.parent_id);
+  };
+
+  const getChildSections = (parentId: number) => {
+    return sections.filter(s => s.parent_id === parentId);
+  };
+
   if (loading) {
     return (
       <TabsContent value="sections">
@@ -83,22 +92,21 @@ export default function SectionsView() {
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            {sections.map(section => {
-              const sectionMaterials = getMaterialsBySection(section.id);
+            {getParentSections().map(parent => {
+              const childSections = getChildSections(parent.id);
+              const parentMaterials = getMaterialsBySection(parent.id);
               
               return (
-                <div key={section.id} className="border rounded-lg p-4">
-                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                    <Icon name="Folder" size={18} className="text-blue-600" />
-                    {section.name}
+                <div key={parent.id} className="border-2 rounded-lg p-4 bg-gradient-to-br from-blue-50 to-white">
+                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                    <Icon name="Folder" size={20} className="text-blue-600" />
+                    {parent.name}
                   </h3>
                   
-                  {sectionMaterials.length === 0 ? (
-                    <p className="text-sm text-gray-500 italic">Нет материалов в этом разделе</p>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {sectionMaterials.map(material => (
-                        <div key={material.id} className="border rounded p-3 bg-gray-50">
+                  {parentMaterials.length > 0 && (
+                    <div className="mb-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {parentMaterials.map(material => (
+                        <div key={material.id} className="border rounded p-3 bg-white shadow-sm">
                           <div className="flex items-start justify-between mb-2">
                             <h4 className="font-medium text-sm">{material.name}</h4>
                             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
@@ -111,7 +119,7 @@ export default function SectionsView() {
                               {material.colors.map(color => (
                                 <div
                                   key={color.id}
-                                  className="flex items-center gap-1 text-xs bg-white border rounded px-2 py-1"
+                                  className="flex items-center gap-1 text-xs bg-gray-50 border rounded px-2 py-1"
                                 >
                                   <div
                                     className="w-3 h-3 rounded-full border"
@@ -125,6 +133,62 @@ export default function SectionsView() {
                         </div>
                       ))}
                     </div>
+                  )}
+                  
+                  {childSections.length > 0 && (
+                    <div className="space-y-4 mt-4">
+                      {childSections.map(child => {
+                        const childMaterials = getMaterialsBySection(child.id);
+                        
+                        return (
+                          <div key={child.id} className="border rounded-lg p-3 bg-white ml-4">
+                            <h4 className="text-base font-semibold mb-2 flex items-center gap-2">
+                              <Icon name="Folder" size={16} className="text-gray-600" />
+                              <span className="text-gray-400">↳</span>
+                              {child.name}
+                            </h4>
+                            
+                            {childMaterials.length === 0 ? (
+                              <p className="text-sm text-gray-500 italic ml-6">Нет материалов в подразделе</p>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 ml-6">
+                                {childMaterials.map(material => (
+                                  <div key={material.id} className="border rounded p-3 bg-gray-50">
+                                    <div className="flex items-start justify-between mb-2">
+                                      <h5 className="font-medium text-sm">{material.name}</h5>
+                                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                        {material.quantity} шт
+                                      </span>
+                                    </div>
+                                    
+                                    {material.colors.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mt-2">
+                                        {material.colors.map(color => (
+                                          <div
+                                            key={color.id}
+                                            className="flex items-center gap-1 text-xs bg-white border rounded px-2 py-1"
+                                          >
+                                            <div
+                                              className="w-3 h-3 rounded-full border"
+                                              style={{ backgroundColor: color.hex_code }}
+                                            />
+                                            <span>{color.name}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
+                  {parentMaterials.length === 0 && childSections.length === 0 && (
+                    <p className="text-sm text-gray-500 italic">Нет материалов и подразделов</p>
                   )}
                 </div>
               );
