@@ -39,6 +39,7 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
   const [materials, setMaterials] = useState<Material[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const [selectedSectionFilter, setSelectedSectionFilter] = useState<string>('all');
   const [formData, setFormData] = useState({
     name: '',
@@ -83,15 +84,21 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
     }
 
     try {
+      const method = editingMaterial ? 'PUT' : 'POST';
+      const body = editingMaterial 
+        ? { ...formData, id: editingMaterial.id, section_id: Number(formData.section_id) }
+        : { ...formData, section_id: Number(formData.section_id) };
+
       const response = await fetch(API, {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, section_id: Number(formData.section_id) })
+        body: JSON.stringify(body)
       });
 
       if (response.ok) {
-        toast.success('Материал создан');
+        toast.success(editingMaterial ? 'Материал обновлен' : 'Материал создан');
         setDialogOpen(false);
+        setEditingMaterial(null);
         setFormData({ name: '', section_id: '', quantity: 0, auto_deduct: false, manual_deduct: true, defect_tracking: false });
         loadMaterials();
       }
@@ -143,6 +150,25 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
     }));
   };
 
+  const handleEdit = (material: Material) => {
+    setEditingMaterial(material);
+    setFormData({
+      name: material.name,
+      section_id: String(material.section_id),
+      quantity: material.quantity,
+      auto_deduct: material.auto_deduct,
+      manual_deduct: material.manual_deduct,
+      defect_tracking: material.defect_tracking
+    });
+    setDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setDialogOpen(false);
+    setEditingMaterial(null);
+    setFormData({ name: '', section_id: '', quantity: 0, auto_deduct: false, manual_deduct: true, defect_tracking: false });
+  };
+
   const filteredMaterials = getFilteredMaterials();
 
   return (
@@ -173,7 +199,7 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
                   ])}
                 </SelectContent>
               </Select>
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <Dialog open={dialogOpen} onOpenChange={handleCloseDialog}>
               <DialogTrigger asChild>
                 <Button>
                   <Icon name="Plus" size={16} className="mr-2" />
@@ -182,7 +208,7 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Новый материал</DialogTitle>
+                  <DialogTitle>{editingMaterial ? 'Редактировать материал' : 'Новый материал'}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
@@ -227,7 +253,9 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
                       <Label>Учет брака</Label>
                     </div>
                   </div>
-                  <Button onClick={handleSubmit} className="w-full">Создать</Button>
+                  <Button onClick={handleSubmit} className="w-full">
+                    {editingMaterial ? 'Сохранить' : 'Создать'}
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -268,9 +296,14 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant="destructive" onClick={() => handleDelete(material.id)}>
-                      <Icon name="Trash2" size={14} />
-                    </Button>
+                    <div className="flex gap-2 justify-end">
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(material)}>
+                        <Icon name="Edit" size={14} />
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => handleDelete(material.id)}>
+                        <Icon name="Trash2" size={14} />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               )))}

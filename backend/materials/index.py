@@ -235,8 +235,22 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             if resource_type == 'section':
                 name = body_data.get('name')
+                parent_id = body_data.get('parent_id')
+                
+                updates = []
+                values = []
+                
                 if name:
-                    cur.execute("UPDATE sections SET name = %s WHERE id = %s RETURNING *", (name, resource_id))
+                    updates.append("name = %s")
+                    values.append(name)
+                
+                if 'parent_id' in body_data:
+                    updates.append("parent_id = %s")
+                    values.append(parent_id)
+                
+                if updates:
+                    values.append(resource_id)
+                    cur.execute(f"UPDATE sections SET {', '.join(updates)} WHERE id = %s RETURNING *", values)
                     result = dict(cur.fetchone()) if cur.rowcount > 0 else None
                     conn.commit()
                 else:

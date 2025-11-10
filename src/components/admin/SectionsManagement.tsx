@@ -25,6 +25,7 @@ interface SectionsManagementProps {
 export default function SectionsManagement({ userId }: SectionsManagementProps) {
   const [sections, setSections] = useState<Section[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingSection, setEditingSection] = useState<Section | null>(null);
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState<string>('');
 
@@ -51,28 +52,42 @@ export default function SectionsManagement({ userId }: SectionsManagementProps) 
     }
 
     try {
+      const method = editingSection ? 'PUT' : 'POST';
+      const body = editingSection
+        ? { id: editingSection.id, name, parent_id: parentId ? parseInt(parentId) : null }
+        : { name, parent_id: parentId ? parseInt(parentId) : null };
+
       const response = await fetch(`${API}?type=section`, {
-        method: 'POST',
+        method,
         headers: { 
           'Content-Type': 'application/json',
           'X-User-Id': String(userId)
         },
-        body: JSON.stringify({ 
-          name,
-          parent_id: parentId ? parseInt(parentId) : null
-        })
+        body: JSON.stringify(body)
       });
 
       if (response.ok) {
-        toast.success('Раздел создан');
-        setDialogOpen(false);
-        setName('');
-        setParentId('');
+        toast.success(editingSection ? 'Раздел обновлен' : 'Раздел создан');
+        handleCloseDialog();
         loadSections();
       }
     } catch (error) {
       toast.error('Ошибка');
     }
+  };
+
+  const handleEdit = (section: Section) => {
+    setEditingSection(section);
+    setName(section.name);
+    setParentId(section.parent_id ? String(section.parent_id) : '');
+    setDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setDialogOpen(false);
+    setEditingSection(null);
+    setName('');
+    setParentId('');
   };
 
   const handleDelete = async (id: number) => {
@@ -101,7 +116,7 @@ export default function SectionsManagement({ userId }: SectionsManagementProps) 
               <CardTitle>Разделы</CardTitle>
               <CardDescription>Управление разделами производства</CardDescription>
             </div>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <Dialog open={dialogOpen} onOpenChange={handleCloseDialog}>
               <DialogTrigger asChild>
                 <Button>
                   <Icon name="Plus" size={16} className="mr-2" />
@@ -110,7 +125,7 @@ export default function SectionsManagement({ userId }: SectionsManagementProps) 
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Новый раздел</DialogTitle>
+                  <DialogTitle>{editingSection ? 'Редактировать раздел' : 'Новый раздел'}</DialogTitle>
                   <DialogDescription>Можно создать подраздел, выбрав родительский раздел</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
@@ -126,7 +141,7 @@ export default function SectionsManagement({ userId }: SectionsManagementProps) 
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="null">Без родителя</SelectItem>
-                        {sections.filter(s => !s.parent_id).map((section) => (
+                        {sections.filter(s => !s.parent_id && (!editingSection || s.id !== editingSection.id)).map((section) => (
                           <SelectItem key={section.id} value={String(section.id)}>
                             {section.name}
                           </SelectItem>
@@ -134,7 +149,9 @@ export default function SectionsManagement({ userId }: SectionsManagementProps) 
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button onClick={handleSubmit} className="w-full">Создать</Button>
+                  <Button onClick={handleSubmit} className="w-full">
+                    {editingSection ? 'Сохранить' : 'Создать'}
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -162,9 +179,14 @@ export default function SectionsManagement({ userId }: SectionsManagementProps) 
                       {parent ? parent.name : '—'}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="destructive" onClick={() => handleDelete(section.id)}>
-                        <Icon name="Trash2" size={14} />
-                      </Button>
+                      <div className="flex gap-2 justify-end">
+                        <Button size="sm" variant="outline" onClick={() => handleEdit(section)}>
+                          <Icon name="Edit" size={14} />
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => handleDelete(section.id)}>
+                          <Icon name="Trash2" size={14} />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
