@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TabsContent } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 
@@ -14,6 +15,7 @@ const API = 'https://functions.poehali.dev/74905bf8-26b1-4b87-9a75-660316d4ba77'
 interface Section {
   id: number;
   name: string;
+  parent_id: number | null;
 }
 
 interface SectionsManagementProps {
@@ -24,6 +26,7 @@ export default function SectionsManagement({ userId }: SectionsManagementProps) 
   const [sections, setSections] = useState<Section[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState('');
+  const [parentId, setParentId] = useState<string>('');
 
   useEffect(() => {
     loadSections();
@@ -54,13 +57,17 @@ export default function SectionsManagement({ userId }: SectionsManagementProps) 
           'Content-Type': 'application/json',
           'X-User-Id': String(userId)
         },
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ 
+          name,
+          parent_id: parentId ? parseInt(parentId) : null
+        })
       });
 
       if (response.ok) {
         toast.success('Раздел создан');
         setDialogOpen(false);
         setName('');
+        setParentId('');
         loadSections();
       }
     } catch (error) {
@@ -104,11 +111,28 @@ export default function SectionsManagement({ userId }: SectionsManagementProps) 
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Новый раздел</DialogTitle>
+                  <DialogDescription>Можно создать подраздел, выбрав родительский раздел</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
                     <Label>Название</Label>
                     <Input value={name} onChange={(e) => setName(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>Родительский раздел (необязательно)</Label>
+                    <Select value={parentId} onValueChange={setParentId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Без родителя" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="null">Без родителя</SelectItem>
+                        {sections.filter(s => !s.parent_id).map((section) => (
+                          <SelectItem key={section.id} value={String(section.id)}>
+                            {section.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <Button onClick={handleSubmit} className="w-full">Создать</Button>
                 </div>
@@ -121,20 +145,30 @@ export default function SectionsManagement({ userId }: SectionsManagementProps) 
             <TableHeader>
               <TableRow>
                 <TableHead>Название</TableHead>
+                <TableHead>Родитель</TableHead>
                 <TableHead className="text-right">Действия</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sections.map((section) => (
-                <TableRow key={section.id}>
-                  <TableCell className="font-medium">{section.name}</TableCell>
-                  <TableCell className="text-right">
-                    <Button size="sm" variant="destructive" onClick={() => handleDelete(section.id)}>
-                      <Icon name="Trash2" size={14} />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {sections.map((section) => {
+                const parent = sections.find(s => s.id === section.parent_id);
+                return (
+                  <TableRow key={section.id}>
+                    <TableCell className="font-medium">
+                      {section.parent_id && <span className="mr-2 text-gray-400">↳</span>}
+                      {section.name}
+                    </TableCell>
+                    <TableCell className="text-gray-600 text-sm">
+                      {parent ? parent.name : '—'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="destructive" onClick={() => handleDelete(section.id)}>
+                        <Icon name="Trash2" size={14} />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>

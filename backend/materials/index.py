@@ -131,6 +131,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             if resource_type == 'section':
                 name = body_data.get('name')
+                parent_id = body_data.get('parent_id')
                 if not name:
                     return {
                         'statusCode': 400,
@@ -139,7 +140,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         'isBase64Encoded': False
                     }
                 
-                cur.execute("INSERT INTO sections (name) VALUES (%s) RETURNING *", (name,))
+                cur.execute("INSERT INTO sections (name, parent_id) VALUES (%s, %s) RETURNING *", (name, parent_id))
                 result = dict(cur.fetchone())
                 conn.commit()
             
