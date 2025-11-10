@@ -231,6 +231,7 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
                 </div>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
