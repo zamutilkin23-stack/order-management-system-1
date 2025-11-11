@@ -41,7 +41,8 @@ export default function TimeTracking({ userRole }: TimeTrackingProps) {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newEmployeeName, setNewEmployeeName] = useState('');
   
-  const isReadOnly = userRole === 'supervisor';
+  const canEdit = userRole === 'admin' || userRole === 'manager' || userRole === 'worker';
+  const isReadOnly = !canEdit;
 
   useEffect(() => {
     loadEmployees();
@@ -282,7 +283,14 @@ export default function TimeTracking({ userRole }: TimeTrackingProps) {
             <div>
               <h2 className="text-2xl font-bold">Табель учета рабочего времени</h2>
               <p className="text-sm text-gray-600 mt-1">
-                {isReadOnly ? 'Только просмотр' : 'Редактирование доступно'}
+                {isReadOnly ? (
+                  'Только просмотр'
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Icon name="Edit" size={14} className="text-green-600" />
+                    Редактирование, заполнение и удаление сотрудников
+                  </span>
+                )}
               </p>
             </div>
             <div className="flex items-center gap-3">
