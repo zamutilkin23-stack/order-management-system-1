@@ -1,66 +1,73 @@
 import { useState, useEffect } from 'react';
 import { TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
-import TimeTrackingHeader from './timetracking/TimeTrackingHeader';
-import TimeTrackingBulkActions from './timetracking/TimeTrackingBulkActions';
-import TimeTrackingTable from './timetracking/TimeTrackingTable';
+import { cn } from '@/lib/utils';
 
 const SCHEDULE_API = 'https://functions.poehali.dev/f617714b-d72a-41e1-87ec-519f6dff2f28';
-const USERS_API = 'https://functions.poehali.dev/cb1be1e9-7f80-4e10-8f1f-4327a0daae82';
 
-interface User {
+interface TimesheetEmployee {
   id: number;
   full_name: string;
-  fired_at: string | null;
 }
 
 interface DayRecord {
   hours: number;
-  comment: string;
   record_id: number | null;
 }
 
 interface UserTimesheet {
-  user_id: number;
+  employee_id: number;
   full_name: string;
-  fired_at: string | null;
   days: Record<string, DayRecord>;
 }
 
-export default function TimeTracking() {
-  const [users, setUsers] = useState<User[]>([]);
+interface TimeTrackingProps {
+  userRole: string;
+}
+
+export default function TimeTracking({ userRole }: TimeTrackingProps) {
+  const [employees, setEmployees] = useState<TimesheetEmployee[]>([]);
   const [timesheet, setTimesheet] = useState<UserTimesheet[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(false);
-  const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set());
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [newEmployeeName, setNewEmployeeName] = useState('');
+  
+  const isReadOnly = userRole === 'supervisor';
 
   useEffect(() => {
-    loadUsers();
+    loadEmployees();
   }, []);
 
   useEffect(() => {
-    if (users.length > 0) {
+    if (employees.length > 0) {
       loadTimesheet();
     }
-  }, [selectedMonth, selectedYear, users]);
+  }, [selectedMonth, selectedYear, employees]);
 
-  const loadUsers = async () => {
+  const loadEmployees = async () => {
     try {
-      const response = await fetch(USERS_API);
+      const response = await fetch(`${SCHEDULE_API}?type=employees`);
       const data = await response.json();
-      const workers = data.filter((u: any) => u.role === 'worker');
-      setUsers(workers);
+      setEmployees(data);
     } catch (error) {
-      toast.error('Ошибка загрузки пользователей');
+      toast.error('Ошибка загрузки сотрудников');
     }
   };
 
   const loadTimesheet = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${SCHEDULE_API}?month=${selectedMonth}&year=${selectedYear}`);
+      const empIds = employees.map(e => e.id).join(',');
+      const response = await fetch(`${SCHEDULE_API}?month=${selectedMonth}&year=${selectedYear}&employee_ids=${empIds}`);
       const data = await response.json();
       setTimesheet(data);
     } catch (error) {
@@ -74,12 +81,50 @@ export default function TimeTracking() {
     return new Date(selectedYear, selectedMonth, 0).getDate();
   };
 
-  const isDateBeforeFired = (dateStr: string, firedAt: string | null) => {
-    if (!firedAt) return true;
-    return new Date(dateStr) <= new Date(firedAt);
+  const addEmployee = async () => {
+    if (!newEmployeeName.trim()) {
+      toast.error('Введите ФИО');
+      return;
+    }
+    
+    try {
+      const response = await fetch(SCHEDULE_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'employee', full_name: newEmployeeName })
+      });
+      
+      if (response.ok) {
+        toast.success('Сотрудник добавлен');
+        setNewEmployeeName('');
+        setShowAddDialog(false);
+        loadEmployees();
+      }
+    } catch (error) {
+      toast.error('Ошибка');
+    }
+  };
+  
+  const deleteEmployee = async (id: number) => {
+    if (!confirm('Удалить сотрудника из списка?')) return;
+    
+    try {
+      const response = await fetch(`${SCHEDULE_API}?type=employee&id=${id}`, { method: 'DELETE' });
+      if (response.ok) {
+        toast.success('Сотрудник удален');
+        loadEmployees();
+      }
+    } catch (error) {
+      toast.error('Ошибка');
+    }
   };
 
-  const handleHoursChange = async (userId: number, dateStr: string, hours: string) => {
+  const handleHoursChange = async (employeeId: number, dateStr: string, hours: string) => {
+    if (isReadOnly) {
+      toast.error('Только просмотр');
+      return;
+    }
+    
     const hoursNum = parseFloat(hours) || 0;
     
     try {
@@ -87,16 +132,14 @@ export default function TimeTracking() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: userId,
+          employee_id: employeeId,
           work_date: dateStr,
-          hours: hoursNum,
-          comment: ''
+          hours: hoursNum
         })
       });
 
       if (response.ok) {
         await loadTimesheet();
-        toast.success('Часы обновлены');
       } else {
         toast.error('Ошибка обновления');
       }
@@ -105,39 +148,9 @@ export default function TimeTracking() {
     }
   };
 
-  const handleFillWeek = async (userId: number, startDay: number) => {
-    const promises = [];
-    for (let i = 0; i < 5; i++) {
-      const day = startDay + i;
-      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const dayOfWeek = new Date(dateStr).getDay();
-      
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        promises.push(
-          fetch(SCHEDULE_API, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              user_id: userId,
-              work_date: dateStr,
-              hours: 8,
-              comment: ''
-            })
-          })
-        );
-      }
-    }
-
-    try {
-      await Promise.all(promises);
-      toast.success('Неделя заполнена');
-      loadTimesheet();
-    } catch (error) {
-      toast.error('Ошибка заполнения');
-    }
-  };
-
-  const handleFillMonth = async (userId: number) => {
+  const handleFillMonth = async (employeeId: number) => {
+    if (isReadOnly) return;
+    
     const daysInMonth = getDaysInMonth();
     const promises = [];
 
@@ -151,10 +164,9 @@ export default function TimeTracking() {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              user_id: userId,
+              employee_id: employeeId,
               work_date: dateStr,
-              hours: 8,
-              comment: ''
+              hours: 8
             })
           })
         );
@@ -173,9 +185,9 @@ export default function TimeTracking() {
     }
   };
 
-  const handleClearMonth = async (userId: number) => {
-    const confirmed = window.confirm('Удалить все часы за месяц для этого сотрудника?');
-    if (!confirmed) return;
+  const handleClearMonth = async (employeeId: number) => {
+    if (isReadOnly) return;
+    if (!window.confirm('Удалить все часы за месяц?')) return;
 
     const daysInMonth = getDaysInMonth();
     const promises = [];
@@ -187,10 +199,9 @@ export default function TimeTracking() {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            user_id: userId,
+            employee_id: employeeId,
             work_date: dateStr,
-            hours: 0,
-            comment: ''
+            hours: 0
           })
         })
       );
@@ -205,115 +216,6 @@ export default function TimeTracking() {
       toast.error('Ошибка очистки');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleBulkEdit = async (userId: number) => {
-    const hoursInput = window.prompt('Введите количество часов для всех будних дней месяца:');
-    if (hoursInput === null) return;
-
-    const hours = parseFloat(hoursInput);
-    if (isNaN(hours) || hours < 0 || hours > 24) {
-      toast.error('Введите корректное число от 0 до 24');
-      return;
-    }
-
-    const daysInMonth = getDaysInMonth();
-    const promises = [];
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const dayOfWeek = new Date(dateStr).getDay();
-      
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        promises.push(
-          fetch(SCHEDULE_API, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              user_id: userId,
-              work_date: dateStr,
-              hours: hours,
-              comment: ''
-            })
-          })
-        );
-      }
-    }
-
-    try {
-      setLoading(true);
-      await Promise.all(promises);
-      toast.success(`Установлено ${hours} часов для всех будних дней`);
-      loadTimesheet();
-    } catch (error) {
-      toast.error('Ошибка обновления');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleFillWeekRange = async (userId: number, startDay: number) => {
-    const promises = [];
-    for (let i = 0; i < 7; i++) {
-      const day = startDay + i;
-      if (day > getDaysInMonth()) break;
-      
-      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const dayOfWeek = new Date(dateStr).getDay();
-      
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        promises.push(
-          fetch(SCHEDULE_API, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              user_id: userId,
-              work_date: dateStr,
-              hours: 8,
-              comment: ''
-            })
-          })
-        );
-      }
-    }
-
-    try {
-      await Promise.all(promises);
-      toast.success('Неделя заполнена');
-      loadTimesheet();
-    } catch (error) {
-      toast.error('Ошибка заполнения');
-    }
-  };
-
-  const handleClearWeekRange = async (userId: number, startDay: number) => {
-    const promises = [];
-    for (let i = 0; i < 7; i++) {
-      const day = startDay + i;
-      if (day > getDaysInMonth()) break;
-      
-      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      promises.push(
-        fetch(SCHEDULE_API, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: userId,
-            work_date: dateStr,
-            hours: 0,
-            comment: ''
-          })
-        })
-      );
-    }
-
-    try {
-      await Promise.all(promises);
-      toast.success('Неделя очищена');
-      loadTimesheet();
-    } catch (error) {
-      toast.error('Ошибка очистки');
     }
   };
 
@@ -352,13 +254,8 @@ export default function TimeTracking() {
         const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const record = user.days[dateStr];
         const hours = record?.hours || 0;
-        
-        if (isDateBeforeFired(dateStr, user.fired_at)) {
-          totalHours += hours;
-          html += `<td>${hours > 0 ? hours : '-'}</td>`;
-        } else {
-          html += `<td style="background: #eee;">-</td>`;
-        }
+        totalHours += hours;
+        html += `<td>${hours > 0 ? hours : '-'}</td>`;
       });
 
       html += `<td class="total">${totalHours}</td></tr>`;
@@ -380,33 +277,136 @@ export default function TimeTracking() {
   return (
     <TabsContent value="timetracking" className="space-y-4">
       <Card>
-        <TimeTrackingHeader
-          selectedMonth={selectedMonth}
-          selectedYear={selectedYear}
-          loading={loading}
-          onMonthChange={setSelectedMonth}
-          onYearChange={setSelectedYear}
-          onRefresh={loadTimesheet}
-          onPrint={handlePrint}
-        />
-        <CardContent>
-          <TimeTrackingBulkActions
-            timesheet={timesheet}
-            onFillWeekRange={handleFillWeekRange}
-            onClearWeekRange={handleClearWeekRange}
-          />
-          <TimeTrackingTable
-            timesheet={timesheet}
-            selectedMonth={selectedMonth}
-            selectedYear={selectedYear}
-            days={days}
-            isDateBeforeFired={isDateBeforeFired}
-            onHoursChange={handleHoursChange}
-            onFillMonth={handleFillMonth}
-            onBulkEdit={handleBulkEdit}
-            onClearMonth={handleClearMonth}
-            setTimesheet={setTimesheet}
-          />
+        <div className="border-b p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">Табель учета рабочего времени</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {isReadOnly ? 'Только просмотр' : 'Редактирование доступно'}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'].map((m, i) => (
+                    <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+                <SelectTrigger className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[2024, 2025, 2026].map(y => (
+                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={loadTimesheet} disabled={loading} variant="outline">
+                <Icon name="RefreshCw" size={16} className={cn('mr-2', loading && 'animate-spin')} />
+                Обновить
+              </Button>
+              <Button onClick={handlePrint} variant="outline">
+                <Icon name="Printer" size={16} className="mr-2" />
+                Печать
+              </Button>
+              {!isReadOnly && (
+                <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Icon name="UserPlus" size={16} className="mr-2" />
+                      Добавить
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Добавить сотрудника</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label>ФИО</Label>
+                        <Input value={newEmployeeName} onChange={(e) => setNewEmployeeName(e.target.value)} />
+                      </div>
+                      <Button onClick={addEmployee} className="w-full">Добавить</Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+          </div>
+        </div>
+        <CardContent className="p-6">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="border p-2 text-left min-w-[200px] sticky left-0 bg-gray-50 z-10">ФИО</th>
+                  {days.map(day => {
+                    const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const dayOfWeek = new Date(dateStr).getDay();
+                    return (
+                      <th key={day} className={cn('border p-1 text-xs min-w-[50px]', (dayOfWeek === 0 || dayOfWeek === 6) && 'bg-red-50')}>
+                        {day}
+                      </th>
+                    );
+                  })}
+                  <th className="border p-2 text-center font-bold">Итого</th>
+                  {!isReadOnly && <th className="border p-2 text-center">Действия</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {timesheet.map(user => {
+                  let totalHours = 0;
+                  return (
+                    <tr key={user.employee_id} className="hover:bg-gray-50">
+                      <td className="border p-2 font-medium sticky left-0 bg-white z-10">
+                        {user.full_name}
+                      </td>
+                      {days.map(day => {
+                        const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                        const record = user.days[dateStr];
+                        const hours = record?.hours || 0;
+                        const dayOfWeek = new Date(dateStr).getDay();
+                        totalHours += hours;
+                        
+                        return (
+                          <td key={day} className={cn('border p-0', (dayOfWeek === 0 || dayOfWeek === 6) && 'bg-red-50')}>
+                            <Input
+                              type="number"
+                              value={hours || ''}
+                              onChange={(e) => handleHoursChange(user.employee_id, dateStr, e.target.value)}
+                              className="border-0 text-center p-1 h-8 text-sm"
+                              disabled={isReadOnly}
+                            />
+                          </td>
+                        );
+                      })}
+                      <td className="border p-2 text-center font-bold">{totalHours}</td>
+                      {!isReadOnly && (
+                        <td className="border p-2">
+                          <div className="flex gap-1 justify-center">
+                            <Button size="sm" variant="outline" onClick={() => handleFillMonth(user.employee_id)} title="Заполнить месяц">
+                              <Icon name="CalendarCheck" size={14} />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleClearMonth(user.employee_id)} title="Очистить месяц">
+                              <Icon name="X" size={14} />
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => deleteEmployee(user.employee_id)} title="Удалить сотрудника">
+                              <Icon name="Trash2" size={14} />
+                            </Button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </TabsContent>

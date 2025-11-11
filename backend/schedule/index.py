@@ -1,13 +1,13 @@
 """
-Business: Manage time tracking with monthly timesheet view and editing
-Args: event with httpMethod, query params for month/year filtering
-Returns: Time tracking data grouped by user or operation result
+Business: Manage time tracking with monthly timesheet view and manual employee list
+Args: event with httpMethod, query params for month/year filtering, type for employees management
+Returns: Time tracking data grouped by employee or operation result
 """
 
 import json
 import os
 from typing import Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -33,85 +33,77 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         if method == 'GET':
             params = event.get('queryStringParameters') or {}
-            user_id = params.get('user_id')
-            month = params.get('month')
-            year = params.get('year')
+            req_type = params.get('type')
             
-            if month and year:
-                start_date = f"{year}-{month:0>2}-01"
-                
-                if int(month) == 12:
-                    end_date = f"{int(year)+1}-01-01"
-                else:
-                    end_date = f"{year}-{int(month)+1:0>2}-01"
-                
-                if user_id:
-                    cur.execute(
-                        """SELECT id, full_name, fired_at
-                           FROM users
-                           WHERE id = %s
-                           AND role = 'worker'""",
-                        (user_id,)
-                    )
-                else:
-                    cur.execute(
-                        """SELECT id, full_name, fired_at
-                           FROM users
-                           WHERE role = 'worker'
-                           AND status = 'active'
-                           ORDER BY full_name"""
-                    )
-                
-                users = cur.fetchall()
-                users_map = {}
-                
-                for user in users:
-                    uid = user['id']
-                    users_map[uid] = {
-                        'user_id': uid,
-                        'full_name': user['full_name'],
-                        'fired_at': user['fired_at'],
-                        'days': {}
-                    }
-                
-                if users_map:
-                    user_ids = list(users_map.keys())
-                    placeholders = ','.join(['%s'] * len(user_ids))
-                    
-                    cur.execute(
-                        f"""SELECT user_id, work_date, hours, comment, id as record_id
-                            FROM time_tracking
-                            WHERE user_id IN ({placeholders})
-                            AND work_date >= %s::date
-                            AND work_date < %s::date
-                            ORDER BY work_date""",
-                        (*user_ids, start_date, end_date)
-                    )
-                    
-                    time_records = cur.fetchall()
-                    
-                    for record in time_records:
-                        uid = record['user_id']
-                        day_key = record['work_date'].strftime('%Y-%m-%d')
-                        users_map[uid]['days'][day_key] = {
-                            'hours': float(record['hours']),
-                            'comment': record['comment'],
-                            'record_id': record['record_id']
-                        }
-                
-                result = list(users_map.values())
+            if req_type == 'employees':
+                cur.execute(
+                    """SELECT id, full_name
+                       FROM timesheet_employees
+                       ORDER BY full_name"""
+                )
+                employees = cur.fetchall()
+                result = [dict(row) for row in employees]
             
             else:
-                cur.execute(
-                    """SELECT tt.*, u.full_name, u.role, u.fired_at
-                       FROM time_tracking tt 
-                       JOIN users u ON tt.user_id = u.id 
-                       WHERE u.role = 'worker'
-                       ORDER BY tt.work_date DESC 
-                       LIMIT 100"""
-                )
-                records = cur.fetchall()
-                result = [dict(row) for row in records]
+                month = params.get('month')
+                year = params.get('year')
+                employee_ids = params.get('employee_ids', '')
+                
+                if month and year and employee_ids:
+                    start_date = f"{year}-{month:0>2}-01"
+                    
+                    if int(month) == 12:
+                        end_date = f"{int(year)+1}-01-01"
+                    else:
+                        end_date = f"{year}-{int(month)+1:0>2}-01"
+                    
+                    emp_id_list = [int(x) for x in employee_ids.split(',') if x]
+                    placeholders = ','.join(['%s'] * len(emp_id_list))
+                    
+                    cur.execute(
+                        f"""SELECT id, full_name
+                           FROM timesheet_employees
+                           WHERE id IN ({placeholders})
+                           ORDER BY full_name""",
+                        tuple(emp_id_list)
+                    )
+                    
+                    employees = cur.fetchall()
+                    employees_map = {}
+                    
+                    for emp in employees:
+                        eid = emp['id']
+                        employees_map[eid] = {
+                            'employee_id': eid,
+                            'full_name': emp['full_name'],
+                            'days': {}
+                        }
+                    
+                    if employees_map:
+                        cur.execute(
+                            f"""SELECT employee_id, work_date, hours, id as record_id
+                                FROM time_tracking
+                                WHERE employee_id IN ({placeholders})
+                                AND work_date >= %s::date
+                                AND work_date < %s::date
+                                ORDER BY work_date""",
+                            (*emp_id_list, start_date, end_date)
+                        )
+                        
+                        time_records = cur.fetchall()
+                        
+                        for record in time_records:
+                            eid = record['employee_id']
+                            if eid in employees_map:
+                                day_key = record['work_date'].strftime('%Y-%m-%d')
+                                employees_map[eid]['days'][day_key] = {
+                                    'hours': float(record['hours']),
+                                    'record_id': record['record_id']
+                                }
+                    
+                    result = list(employees_map.values())
+                else:
+                    result = []
             
             cur.close()
             conn.close()
@@ -125,30 +117,53 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         elif method == 'POST':
             body_data = json.loads(event.get('body', '{}'))
-            user_id = body_data.get('user_id')
-            work_date = body_data.get('work_date')
-            hours = body_data.get('hours', 0)
-            comment = body_data.get('comment', '')
+            req_type = body_data.get('type')
             
-            if not all([user_id, work_date]):
-                return {
-                    'statusCode': 400,
-                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                    'body': json.dumps({'error': 'Заполните обязательные поля'}),
-                    'isBase64Encoded': False
-                }
+            if req_type == 'employee':
+                full_name = body_data.get('full_name')
+                
+                if not full_name:
+                    return {
+                        'statusCode': 400,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'error': 'Укажите ФИО'}),
+                        'isBase64Encoded': False
+                    }
+                
+                cur.execute(
+                    """INSERT INTO timesheet_employees (full_name) 
+                       VALUES (%s) 
+                       RETURNING *""",
+                    (full_name,)
+                )
+                employee = cur.fetchone()
+                conn.commit()
+                result = dict(employee)
             
-            cur.execute(
-                """INSERT INTO time_tracking (user_id, work_date, hours, comment) 
-                   VALUES (%s, %s, %s, %s) 
-                   ON CONFLICT (user_id, work_date) 
-                   DO UPDATE SET hours = EXCLUDED.hours, comment = EXCLUDED.comment, updated_at = NOW()
-                   RETURNING *""",
-                (user_id, work_date, hours, comment)
-            )
-            record = cur.fetchone()
-            conn.commit()
-            result = dict(record)
+            else:
+                employee_id = body_data.get('employee_id')
+                work_date = body_data.get('work_date')
+                hours = body_data.get('hours', 0)
+                
+                if not all([employee_id, work_date]):
+                    return {
+                        'statusCode': 400,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'error': 'Заполните обязательные поля'}),
+                        'isBase64Encoded': False
+                    }
+                
+                cur.execute(
+                    """INSERT INTO time_tracking (employee_id, work_date, hours) 
+                       VALUES (%s, %s, %s) 
+                       ON CONFLICT (employee_id, work_date) 
+                       DO UPDATE SET hours = EXCLUDED.hours, updated_at = NOW()
+                       RETURNING *""",
+                    (employee_id, work_date, hours)
+                )
+                record = cur.fetchone()
+                conn.commit()
+                result = dict(record)
             
             cur.close()
             conn.close()
@@ -162,52 +177,26 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         elif method == 'PUT':
             body_data = json.loads(event.get('body', '{}'))
-            record_id = body_data.get('id')
-            user_id = body_data.get('user_id')
+            employee_id = body_data.get('employee_id')
             work_date = body_data.get('work_date')
             hours = body_data.get('hours')
-            comment = body_data.get('comment', '')
-            requesting_user_id = event.get('headers', {}).get('x-user-id')
             
-            # Проверка прав: работники могут редактировать только свой табель
-            if requesting_user_id and user_id:
-                cur.execute("SELECT role FROM users WHERE id = %s", (requesting_user_id,))
-                user_row = cur.fetchone()
-                if user_row and user_row['role'] == 'worker' and str(user_id) != str(requesting_user_id):
-                    cur.close()
-                    conn.close()
-                    return {
-                        'statusCode': 403,
-                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                        'body': json.dumps({'error': 'Вы можете редактировать только свой табель'}),
-                        'isBase64Encoded': False
-                    }
-            
-            if record_id:
-                cur.execute(
-                    """UPDATE time_tracking 
-                       SET hours = %s, comment = %s, updated_at = NOW() 
-                       WHERE id = %s 
-                       RETURNING *""",
-                    (hours, comment, record_id)
-                )
-            elif user_id and work_date:
-                cur.execute(
-                    """INSERT INTO time_tracking (user_id, work_date, hours, comment) 
-                       VALUES (%s, %s, %s, %s) 
-                       ON CONFLICT (user_id, work_date) 
-                       DO UPDATE SET hours = EXCLUDED.hours, comment = EXCLUDED.comment, updated_at = NOW()
-                       RETURNING *""",
-                    (user_id, work_date, hours, comment)
-                )
-            else:
+            if not all([employee_id is not None, work_date, hours is not None]):
                 return {
                     'statusCode': 400,
                     'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                    'body': json.dumps({'error': 'Укажите ID записи или user_id с work_date'}),
+                    'body': json.dumps({'error': 'Укажите employee_id, work_date и hours'}),
                     'isBase64Encoded': False
                 }
             
+            cur.execute(
+                """INSERT INTO time_tracking (employee_id, work_date, hours) 
+                   VALUES (%s, %s, %s) 
+                   ON CONFLICT (employee_id, work_date) 
+                   DO UPDATE SET hours = EXCLUDED.hours, updated_at = NOW()
+                   RETURNING *""",
+                (employee_id, work_date, hours)
+            )
             record = cur.fetchone()
             conn.commit()
             result = dict(record) if record else None
@@ -224,28 +213,39 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         elif method == 'DELETE':
             params = event.get('queryStringParameters') or {}
-            record_id = params.get('id')
+            req_type = params.get('type')
+            resource_id = params.get('id')
             
-            if not record_id:
+            if req_type == 'employee' and resource_id:
+                cur.execute("UPDATE time_tracking SET employee_id = NULL WHERE employee_id = %s", (resource_id,))
+                cur.execute("UPDATE timesheet_employees SET full_name = full_name WHERE id = %s", (resource_id,))
+                conn.commit()
+                
+                cur.close()
+                conn.close()
+                
                 return {
-                    'statusCode': 400,
+                    'statusCode': 200,
                     'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                    'body': json.dumps({'error': 'ID обязателен'}),
+                    'body': json.dumps({'success': True}),
                     'isBase64Encoded': False
                 }
             
-            cur.execute("DELETE FROM time_tracking WHERE id = %s", (record_id,))
-            conn.commit()
-            cur.close()
-            conn.close()
-            
             return {
-                'statusCode': 200,
+                'statusCode': 400,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'success': True}),
+                'body': json.dumps({'error': 'Укажите type=employee и id'}),
                 'isBase64Encoded': False
             }
         
+        else:
+            return {
+                'statusCode': 405,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': 'Метод не поддерживается'}),
+                'isBase64Encoded': False
+            }
+    
     except Exception as e:
         return {
             'statusCode': 500,
@@ -253,10 +253,3 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'body': json.dumps({'error': str(e)}),
             'isBase64Encoded': False
         }
-    
-    return {
-        'statusCode': 405,
-        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-        'body': json.dumps({'error': 'Метод не поддерживается'}),
-        'isBase64Encoded': False
-    }

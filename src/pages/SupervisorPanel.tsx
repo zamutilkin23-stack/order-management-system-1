@@ -60,7 +60,7 @@ export default function SupervisorPanel({ user, onLogout }: SupervisorPanelProps
             </TabsTrigger>
           </TabsList>
 
-          <TimeTracking />
+          <TimeTracking userRole={user.role} />
           <SectionsManagement userId={user.id} />
           <ColorsManagement userId={user.id} />
           <MaterialsManagement userId={user.id} />

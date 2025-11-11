@@ -1,0 +1,2 @@
+ALTER TABLE t_p435659_order_management_sys.time_tracking 
+ADD CONSTRAINT time_tracking_employee_date_unique UNIQUE (employee_id, work_date);
