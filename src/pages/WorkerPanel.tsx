@@ -7,6 +7,7 @@ import WorkerOrders from '@/components/worker/WorkerOrders';
 import SectionsView from '@/components/worker/SectionsView';
 import TimeTracking from '@/components/admin/TimeTracking';
 import SectionsManagement from '@/components/admin/SectionsManagement';
+import MaterialsManagement from '@/components/worker/MaterialsManagement';
 
 const ORDERS_API = 'https://functions.poehali.dev/0ffd935b-d2ee-48e1-a9e4-2b8fe0ffb3dd';
 const MATERIALS_API = 'https://functions.poehali.dev/74905bf8-26b1-4b87-9a75-660316d4ba77';
@@ -189,6 +190,7 @@ export default function WorkerPanel({ user, onLogout }: WorkerPanelProps) {
           />
 
           <SectionsManagement userId={user.id} />
+          <MaterialsManagement />
           <SectionsView />
           <TimeTracking userRole={user.role} />
         </Tabs>
