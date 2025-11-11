@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 
@@ -18,6 +19,7 @@ interface Order {
   status: string;
   comment: string;
   created_at: string;
+  shipped_at?: string;
   items: OrderItem[];
 }
 
@@ -68,9 +70,32 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [shipItems, setShipItems] = useState<ShipItem[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [dateFilter, setDateFilter] = useState('all');
 
   const completedOrders = orders.filter(o => o.status === 'completed');
-  const shippedOrders = orders.filter(o => o.status === 'shipped');
+  
+  const filterShippedByDate = (orders: Order[]) => {
+    const now = new Date();
+    return orders.filter(order => {
+      if (!order.shipped_at) return false;
+      const shippedDate = new Date(order.shipped_at);
+      
+      switch (dateFilter) {
+        case 'today':
+          return shippedDate.toDateString() === now.toDateString();
+        case 'week':
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          return shippedDate >= weekAgo;
+        case 'month':
+          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          return shippedDate >= monthAgo;
+        default:
+          return true;
+      }
+    });
+  };
+  
+  const shippedOrders = filterShippedByDate(orders.filter(o => o.status === 'shipped'));
 
   const getSectionName = (id: number) => sections.find(s => s.id === id)?.name || '—';
   const getMaterialName = (id: number) => materials.find(m => m.id === id)?.name || '—';
@@ -180,13 +205,29 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Icon name="PackageCheck" size={20} className="text-blue-600" />
-              Отправленные
-            </CardTitle>
-            <CardDescription>
-              История отправленных заявок
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Icon name="PackageCheck" size={20} className="text-blue-600" />
+                  Отправленные
+                </CardTitle>
+                <CardDescription>
+                  История отправленных заявок
+                </CardDescription>
+              </div>
+              
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">За всё время</SelectItem>
+                  <SelectItem value="today">За сегодня</SelectItem>
+                  <SelectItem value="week">За неделю</SelectItem>
+                  <SelectItem value="month">За месяц</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -194,6 +235,9 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
                 <div className="text-center py-8 text-gray-500">
                   <Icon name="Archive" size={48} className="mx-auto mb-3 opacity-50" />
                   <p>Нет отправленных заявок</p>
+                  {dateFilter !== 'all' && (
+                    <p className="text-xs mt-2">за выбранный период</p>
+                  )}
                 </div>
               ) : (
                 shippedOrders.map(order => (
@@ -202,6 +246,16 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
                       <div>
                         <h3 className="font-semibold">№ {order.order_number}</h3>
                         <p className="text-xs text-gray-600">{getSectionName(order.section_id)}</p>
+                        {order.shipped_at && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {new Date(order.shipped_at).toLocaleDateString('ru-RU', {
+                              day: 'numeric',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        )}
                       </div>
                       <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
                         Отправлено
