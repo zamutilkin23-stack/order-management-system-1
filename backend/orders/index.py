@@ -35,8 +35,27 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             params = event.get('queryStringParameters') or {}
             order_id = params.get('id')
             status_filter = params.get('status')
+            get_shipped = params.get('get_shipped')
             
-            if order_id:
+            if get_shipped:
+                cur.execute("""
+                    SELECT 
+                        so.id,
+                        so.order_id,
+                        so.material_id,
+                        so.color_id,
+                        so.quantity,
+                        so.is_defective,
+                        so.shipped_at,
+                        o.order_number,
+                        o.section_id
+                    FROM shipped_orders so
+                    JOIN orders o ON o.id = so.order_id
+                    ORDER BY so.shipped_at DESC
+                """)
+                shipped_items = cur.fetchall()
+                result = [dict(item) for item in shipped_items]
+            elif order_id:
                 cur.execute("SELECT * FROM orders WHERE id = %s", (order_id,))
                 order = cur.fetchone()
                 

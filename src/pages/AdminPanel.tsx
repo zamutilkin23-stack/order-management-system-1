@@ -9,6 +9,7 @@ import ColorsManagement from '@/components/admin/ColorsManagement';
 import MaterialsManagement from '@/components/admin/MaterialsManagement';
 import TimeTracking from '@/components/admin/TimeTracking';
 import ShippedOrders from '@/components/manager/ShippedOrders';
+import DefectiveReport from '@/components/admin/DefectiveReport';
 
 interface User {
   id: number;
@@ -137,7 +138,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="users">
               <Icon name="Users" size={16} className="mr-2" />
               Пользователи
@@ -145,6 +146,10 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
             <TabsTrigger value="shipped">
               <Icon name="PackageCheck" size={16} className="mr-2" />
               Отправлено
+            </TabsTrigger>
+            <TabsTrigger value="defective">
+              <Icon name="AlertTriangle" size={16} className="mr-2" />
+              Брак
             </TabsTrigger>
             <TabsTrigger value="sections">
               <Icon name="FolderTree" size={16} className="mr-2" />
@@ -173,6 +178,7 @@ export default function AdminPanel({ user, onLogout }: AdminPanelProps) {
             userId={user.id}
             onRefresh={loadOrders}
           />
+          <DefectiveReport />
           <SectionsManagement userId={user.id} />
           <ColorsManagement userId={user.id} />
           <MaterialsManagement userId={user.id} />
