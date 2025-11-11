@@ -167,10 +167,48 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 conn.commit()
             
             if 'status' in body_data:
-                cur.execute(
-                    "UPDATE orders SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-                    (body_data['status'], order_id)
-                )
+                new_status = body_data['status']
+                
+                if new_status == 'shipped':
+                    shipped_items = body_data.get('shipped_items', [])
+                    shipped_by = body_data.get('shipped_by')
+                    
+                    for item in shipped_items:
+                        material_id = item.get('material_id')
+                        color_id = item.get('color_id')
+                        quantity = item.get('quantity')
+                        is_defective = item.get('is_defective', False)
+                        
+                        cur.execute(
+                            """INSERT INTO shipped_orders (order_id, material_id, color_id, quantity, is_defective, shipped_by)
+                               VALUES (%s, %s, %s, %s, %s, %s)""",
+                            (order_id, material_id, color_id, quantity, is_defective, shipped_by)
+                        )
+                        
+                        if not is_defective:
+                            cur.execute(
+                                "SELECT quantity FROM materials WHERE id = %s",
+                                (material_id,)
+                            )
+                            material_row = cur.fetchone()
+                            
+                            if material_row:
+                                new_quantity = material_row['quantity'] - quantity
+                                cur.execute(
+                                    "UPDATE materials SET quantity = %s WHERE id = %s",
+                                    (new_quantity, material_id)
+                                )
+                    
+                    cur.execute(
+                        "UPDATE orders SET status = %s, shipped_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                        (new_status, order_id)
+                    )
+                else:
+                    cur.execute(
+                        "UPDATE orders SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                        (new_status, order_id)
+                    )
+                
                 conn.commit()
             
             cur.execute("SELECT * FROM orders WHERE id = %s", (order_id,))
