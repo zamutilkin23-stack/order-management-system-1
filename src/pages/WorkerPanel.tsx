@@ -3,13 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
-import WorkerOrders from '@/components/worker/WorkerOrders';
+import OrdersSection from '@/components/manager/OrdersSection';
 import SectionsView from '@/components/worker/SectionsView';
 import TimeTracking from '@/components/admin/TimeTracking';
 import SectionsManagement from '@/components/admin/SectionsManagement';
 import MaterialsManagement from '@/components/worker/MaterialsManagement';
 import ShippedOrders from '@/components/manager/ShippedOrders';
 import MaterialsArrival from '@/components/manager/MaterialsArrival';
+import OrderStatusManager from '@/components/manager/OrderStatusManager';
 
 const ORDERS_API = 'https://functions.poehali.dev/0ffd935b-d2ee-48e1-a9e4-2b8fe0ffb3dd';
 const MATERIALS_API = 'https://functions.poehali.dev/74905bf8-26b1-4b87-9a75-660316d4ba77';
@@ -116,6 +117,52 @@ export default function WorkerPanel({ user, onLogout }: WorkerPanelProps) {
     }
   };
 
+  const createOrder = async (orderData: any) => {
+    try {
+      const response = await fetch(ORDERS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...orderData,
+          created_by: user.id
+        })
+      });
+
+      if (response.ok) {
+        toast.success('Заявка создана');
+        loadOrders();
+        return true;
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Ошибка создания');
+        return false;
+      }
+    } catch (error) {
+      toast.error('Ошибка сервера');
+      return false;
+    }
+  };
+
+  const deleteOrder = async (orderId: number) => {
+    if (!confirm('Удалить заявку?')) return;
+    
+    try {
+      const response = await fetch(`${ORDERS_API}?id=${orderId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        toast.success('Заявка удалена');
+        loadOrders();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Ошибка удаления');
+      }
+    } catch (error) {
+      toast.error('Ошибка сервера');
+    }
+  };
+
   const updateOrderItem = async (orderId: number, itemId: number, quantityCompleted: number) => {
     try {
       const response = await fetch(ORDERS_API, {
@@ -131,7 +178,6 @@ export default function WorkerPanel({ user, onLogout }: WorkerPanelProps) {
       if (response.ok) {
         toast.success('Количество обновлено');
         loadOrders();
-        loadMaterials();
       } else {
         const error = await response.json();
         toast.error(error.error || 'Ошибка обновления');
@@ -163,10 +209,14 @@ export default function WorkerPanel({ user, onLogout }: WorkerPanelProps) {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="orders" className="space-y-6">
-          <TabsList className="grid w-full max-w-4xl grid-cols-6">
+          <TabsList className="grid w-full max-w-5xl grid-cols-7">
             <TabsTrigger value="orders">
               <Icon name="ClipboardList" size={16} className="mr-2" />
               Заявки
+            </TabsTrigger>
+            <TabsTrigger value="progress">
+              <Icon name="TrendingUp" size={16} className="mr-2" />
+              Выполнение
             </TabsTrigger>
             <TabsTrigger value="shipped">
               <Icon name="PackageCheck" size={16} className="mr-2" />
@@ -190,7 +240,18 @@ export default function WorkerPanel({ user, onLogout }: WorkerPanelProps) {
             </TabsTrigger>
           </TabsList>
 
-          <WorkerOrders
+          <OrdersSection
+            orders={orders}
+            materials={materials}
+            sections={sections}
+            colors={colors}
+            loading={false}
+            onCreateOrder={createOrder}
+            onDeleteOrder={deleteOrder}
+            onRefresh={loadOrders}
+          />
+
+          <OrderStatusManager
             orders={orders}
             materials={materials}
             sections={sections}
