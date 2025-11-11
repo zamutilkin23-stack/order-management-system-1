@@ -141,6 +141,7 @@ export default function TimeTracking({ userRole }: TimeTrackingProps) {
 
       if (response.ok) {
         await loadTimesheet();
+        toast.success('Сохранено', { duration: 1000 });
       } else {
         toast.error('Ошибка обновления');
       }
@@ -287,8 +288,8 @@ export default function TimeTracking({ userRole }: TimeTrackingProps) {
                   'Только просмотр'
                 ) : (
                   <span className="flex items-center gap-2">
-                    <Icon name="Edit" size={14} className="text-green-600" />
-                    Редактирование, заполнение и удаление сотрудников
+                    <Icon name="Save" size={14} className="text-green-600" />
+                    Автосохранение при вводе · Добавление/удаление сотрудников
                   </span>
                 )}
               </p>

@@ -37,6 +37,8 @@ export default function MaterialsManagement() {
   const [colors, setColors] = useState<Color[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   
   const [newMaterial, setNewMaterial] = useState({
     name: '',
@@ -102,6 +104,61 @@ export default function MaterialsManagement() {
     } catch (error) {
       toast.error('Ошибка сервера');
     }
+  };
+
+  const handleEditMaterial = async () => {
+    if (!newMaterial.name.trim() || !newMaterial.section_id || !newMaterial.quantity) {
+      toast.error('Заполните все обязательные поля');
+      return;
+    }
+
+    try {
+      const response = await fetch(API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'material',
+          id: editingId,
+          name: newMaterial.name,
+          section_id: parseInt(newMaterial.section_id),
+          quantity: parseInt(newMaterial.quantity),
+          color_ids: newMaterial.color_ids
+        })
+      });
+
+      if (response.ok) {
+        toast.success('Материал обновлён');
+        setIsDialogOpen(false);
+        setIsEditMode(false);
+        setEditingId(null);
+        setNewMaterial({ name: '', section_id: '', quantity: '', color_ids: [] });
+        loadData();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Ошибка обновления');
+      }
+    } catch (error) {
+      toast.error('Ошибка сервера');
+    }
+  };
+
+  const openEditDialog = (material: Material) => {
+    setIsEditMode(true);
+    setEditingId(material.id);
+    setNewMaterial({
+      name: material.name,
+      section_id: material.section_id.toString(),
+      quantity: material.quantity.toString(),
+      color_ids: material.colors.map(c => c.id)
+    });
+    setIsDialogOpen(true);
+  };
+
+  const openAddDialog = () => {
+    setIsEditMode(false);
+    setEditingId(null);
+    setNewMaterial({ name: '', section_id: '', quantity: '', color_ids: [] });
+    setIsDialogOpen(true);
   };
 
   const handleDeleteMaterial = async (id: number) => {
@@ -170,20 +227,20 @@ export default function MaterialsManagement() {
                 Управление материалами
               </CardTitle>
               <CardDescription>
-                Добавление и удаление материалов
+                Добавление, редактирование и удаление материалов
               </CardDescription>
             </div>
             
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button onClick={openAddDialog}>
                   <Icon name="Plus" size={16} className="mr-2" />
                   Добавить материал
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Новый материал</DialogTitle>
+                  <DialogTitle>{isEditMode ? 'Редактировать материал' : 'Новый материал'}</DialogTitle>
                   <DialogDescription>
                     Заполните информацию о материале
                   </DialogDescription>
@@ -252,9 +309,9 @@ export default function MaterialsManagement() {
                 </div>
                 
                 <div className="flex gap-2">
-                  <Button onClick={handleAddMaterial} className="flex-1">
-                    <Icon name="Plus" size={16} className="mr-2" />
-                    Добавить
+                  <Button onClick={isEditMode ? handleEditMaterial : handleAddMaterial} className="flex-1">
+                    <Icon name={isEditMode ? "Save" : "Plus"} size={16} className="mr-2" />
+                    {isEditMode ? 'Сохранить' : 'Добавить'}
                   </Button>
                   <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1">
                     Отмена
@@ -282,14 +339,24 @@ export default function MaterialsManagement() {
                         <h3 className="font-semibold text-base mb-1">{material.name}</h3>
                         <p className="text-xs text-gray-600">{getSectionName(material.section_id)}</p>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteMaterial(material.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Icon name="Trash2" size={16} />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditDialog(material)}
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          <Icon name="Edit" size={16} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteMaterial(material.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Icon name="Trash2" size={16} />
+                        </Button>
+                      </div>
                     </div>
                     
                     <div className="flex items-center gap-2 mb-3">
