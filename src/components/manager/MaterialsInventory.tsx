@@ -3,9 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TabsContent } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 interface Material {
@@ -41,6 +44,16 @@ export default function MaterialsInventory({
   onRefresh
 }: MaterialsInventoryProps) {
   const [sectionFilter, setSectionFilter] = useState('all');
+  const [shipDialogOpen, setShipDialogOpen] = useState(false);
+  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
+  const [shipFormData, setShipFormData] = useState({
+    color_id: '',
+    quantity: 0,
+    recipient: '',
+    comment: ''
+  });
+
+  const SHIPMENTS_API = '/api/materials';
 
   const handleQuantityChange = (materialId: number) => {
     const amount = prompt('Введите количество для добавления (отрицательное для списания):');
@@ -48,6 +61,55 @@ export default function MaterialsInventory({
       const change = Number(amount);
       const comment = prompt('Комментарий (необязательно):') || '';
       onUpdateQuantity(materialId, change, comment);
+    }
+  };
+
+  const openShipDialog = (material: Material) => {
+    setSelectedMaterial(material);
+    setShipFormData({
+      color_id: '',
+      quantity: 0,
+      recipient: '',
+      comment: ''
+    });
+    setShipDialogOpen(true);
+  };
+
+  const handleShipSubmit = async () => {
+    if (!selectedMaterial || !shipFormData.color_id || shipFormData.quantity <= 0) {
+      toast.error('Заполните все обязательные поля');
+      return;
+    }
+
+    if (shipFormData.quantity > selectedMaterial.quantity) {
+      toast.error('Недостаточно материала на складе');
+      return;
+    }
+
+    try {
+      const response = await fetch(SHIPMENTS_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedMaterial.id,
+          quantity_change: -shipFormData.quantity,
+          comment: `Отправка: ${shipFormData.recipient || 'без получателя'}. ${shipFormData.comment}`,
+          ship_material: true,
+          color_id: Number(shipFormData.color_id),
+          recipient: shipFormData.recipient
+        })
+      });
+
+      if (response.ok) {
+        toast.success('Материал отправлен');
+        setShipDialogOpen(false);
+        onRefresh();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Ошибка отправки');
+      }
+    } catch (error) {
+      toast.error('Ошибка сервера');
     }
   };
 
@@ -123,7 +185,7 @@ export default function MaterialsInventory({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-2">
-            <Label className="text-sm font-medium">Раздел:</Label>
+            <span className="text-sm font-medium">Раздел:</span>
             <Select value={sectionFilter} onValueChange={setSectionFilter}>
               <SelectTrigger className="w-48">
                 <SelectValue />
@@ -143,7 +205,7 @@ export default function MaterialsInventory({
                 <TableHead>Материал</TableHead>
                 <TableHead>Раздел</TableHead>
                 <TableHead className="text-right">Количество</TableHead>
-                <TableHead className="text-right">Действия</TableHead>
+                <TableHead className="text-right" colSpan={2}>Действия</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -154,7 +216,7 @@ export default function MaterialsInventory({
                   <TableCell className={cn('text-right font-mono text-lg', material.quantity < 10 && 'text-red-600 font-bold')}>
                     {material.quantity}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right space-x-2">
                     <Button
                       size="sm"
                       variant="outline"
@@ -163,6 +225,14 @@ export default function MaterialsInventory({
                       <Icon name="Edit" size={14} className="mr-1" />
                       Изменить
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => openShipDialog(material)}
+                    >
+                      <Icon name="Send" size={14} className="mr-1" />
+                      Отправить
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -170,10 +240,82 @@ export default function MaterialsInventory({
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={shipDialogOpen} onOpenChange={setShipDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Отправить материал</DialogTitle>
+            <DialogDescription>
+              {selectedMaterial?.name} (доступно: {selectedMaterial?.quantity} шт)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Цвет *</Label>
+              <Select
+                value={shipFormData.color_id}
+                onValueChange={(value) => setShipFormData({ ...shipFormData, color_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите цвет" />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectedMaterial?.colors?.map(c => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-4 h-4 rounded border"
+                          style={{ backgroundColor: c.hex_code }}
+                        />
+                        {c.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Количество *</Label>
+              <Input
+                type="number"
+                min="1"
+                max={selectedMaterial?.quantity}
+                value={shipFormData.quantity}
+                onChange={(e) => setShipFormData({ ...shipFormData, quantity: Number(e.target.value) })}
+                placeholder="0"
+              />
+            </div>
+
+            <div>
+              <Label>Получатель</Label>
+              <Input
+                value={shipFormData.recipient}
+                onChange={(e) => setShipFormData({ ...shipFormData, recipient: e.target.value })}
+                placeholder="ООО 'Компания'"
+              />
+            </div>
+
+            <div>
+              <Label>Комментарий</Label>
+              <Input
+                value={shipFormData.comment}
+                onChange={(e) => setShipFormData({ ...shipFormData, comment: e.target.value })}
+                placeholder="Примечание"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button onClick={handleShipSubmit} className="flex-1">
+                Отправить
+              </Button>
+              <Button variant="outline" onClick={() => setShipDialogOpen(false)}>
+                Отмена
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </TabsContent>
   );
-}
-
-function Label({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <span className={className}>{children}</span>;
 }

@@ -214,14 +214,17 @@ export default function OrderStatusManager({
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="font-medium">{getMaterialName(item.material_id)}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <div
-                              className="w-4 h-4 rounded border"
-                              style={{ backgroundColor: getColorHex(item.color_id) }}
-                            />
-                            <span className="text-sm text-gray-600">{getColorName(item.color_id)}</span>
-                          </div>
-                        </div>
+                          {item.color_id ? (
+                            <div className="flex items-center gap-2 mt-1">
+                              <div
+                                className="w-4 h-4 rounded border"
+                                style={{ backgroundColor: getColorHex(item.color_id) }}
+                              />
+                              <span className="text-sm text-gray-600">{getColorName(item.color_id)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-orange-600 mt-1 inline-block">⚠️ Цвет не указан - укажите при выполнении</span>
+                          )}</div>
                         <Badge variant={item.quantity_completed >= item.quantity_required ? 'default' : 'outline'}>
                           {item.quantity_completed} / {item.quantity_required}
                         </Badge>

@@ -295,6 +295,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         "INSERT INTO material_history (material_id, user_id, quantity_change, action_type, comment) VALUES (%s, %s, %s, %s, %s)",
                         (resource_id, user_id, body_data['quantity_change'], action_type, comment)
                     )
+                    
+                    if body_data.get('ship_material'):
+                        color_id = body_data.get('color_id')
+                        recipient = body_data.get('recipient', '')
+                        quantity = abs(body_data['quantity_change'])
+                        
+                        cur.execute(
+                            "INSERT INTO shipments (material_id, color_id, quantity, recipient, comment) VALUES (%s, %s, %s, %s, %s)",
+                            (resource_id, color_id, quantity, recipient, comment)
+                        )
                 
                 if updates:
                     updates.append("updated_at = CURRENT_TIMESTAMP")

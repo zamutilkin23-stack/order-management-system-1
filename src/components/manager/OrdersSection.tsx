@@ -142,7 +142,10 @@ export default function OrdersSection({
 
   const getSectionName = (id: number) => sections.find(s => s.id === id)?.name || '—';
   const getMaterialName = (id: number) => materials.find(m => m.id === id)?.name || '—';
-  const getColorName = (id: number) => colors.find(c => c.id === id)?.name || '—';
+  const getColorName = (id: number) => {
+    if (!id) return 'Не указан';
+    return colors.find(c => c.id === id)?.name || '—';
+  };
 
   const filteredOrders = orders.filter(order => {
     if (statusFilter === 'all') return true;
@@ -293,12 +296,13 @@ export default function OrdersSection({
                             </Select>
                           </div>
                           <div className="col-span-3">
-                            <Label className="text-xs">Цвет</Label>
+                            <Label className="text-xs">Цвет (необязательно)</Label>
                             <Select value={item.color_id} onValueChange={(value) => updateItem(index, 'color_id', value)}>
                               <SelectTrigger>
-                                <SelectValue placeholder="Цвет" />
+                                <SelectValue placeholder="Не указан" />
                               </SelectTrigger>
                               <SelectContent>
+                                <SelectItem value="">Не указан</SelectItem>
                                 {colors.map(c => (
                                   <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                                 ))}
