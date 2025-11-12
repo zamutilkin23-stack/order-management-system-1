@@ -37,6 +37,7 @@ interface Material {
   section_id: number;
   quantity: number;
   colors: Color[];
+  auto_deduct?: boolean;
 }
 
 interface Section {
@@ -72,7 +73,10 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [shipItems, setShipItems] = useState<ShipItem[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFreeShipmentDialog, setIsFreeShipmentDialog] = useState(false);
   const [dateFilter, setDateFilter] = useState('all');
+  const [shipmentComment, setShipmentComment] = useState('');
+  const [shipmentMode, setShipmentMode] = useState<'order' | 'free'>('order');
 
   const completedOrders = orders.filter(o => o.status === 'completed');
   
@@ -104,6 +108,7 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
   const getColorName = (id: number) => colors.find(c => c.id === id)?.name || '—';
 
   const openShipDialog = (order: Order) => {
+    setShipmentMode('order');
     setSelectedOrder(order);
     setShipItems(order.items.map(item => {
       const material = materials.find(m => m.id === item.material_id);
@@ -120,14 +125,103 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
     setIsDialogOpen(true);
   };
 
-  const handleShip = async () => {
-    if (!selectedOrder) return;
+  const openFreeShipmentDialog = () => {
+    setShipmentMode('free');
+    setShipItems([{
+      material_id: 0,
+      color_id: null,
+      quantity: 0,
+      is_defective: false,
+      available_colors: [],
+      auto_deduct: false
+    }]);
+    setShipmentComment('');
+    setIsFreeShipmentDialog(true);
+  };
 
+  const addFreeShipmentItem = () => {
+    setShipItems([...shipItems, {
+      material_id: 0,
+      color_id: null,
+      quantity: 0,
+      is_defective: false,
+      available_colors: [],
+      auto_deduct: false
+    }]);
+  };
+
+  const removeFreeShipmentItem = (index: number) => {
+    if (shipItems.length > 1) {
+      setShipItems(shipItems.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateFreeShipmentItem = (index: number, field: string, value: any) => {
+    const newItems = [...shipItems];
+    newItems[index] = { ...newItems[index], [field]: value };
+    
+    if (field === 'material_id') {
+      const material = materials.find(m => m.id === Number(value));
+      newItems[index].available_colors = material?.colors || [];
+      newItems[index].auto_deduct = material?.auto_deduct || false;
+      newItems[index].color_id = null;
+    }
+    
+    setShipItems(newItems);
+  };
+
+  const handleShip = async () => {
     const missingColors = shipItems.filter(item => !item.color_id || item.color_id === 0);
     if (missingColors.length > 0) {
       toast.error('Укажите цвет для всех материалов');
       return;
     }
+
+    if (shipmentMode === 'free') {
+      const missingMaterials = shipItems.filter(item => !item.material_id || item.material_id === 0);
+      if (missingMaterials.length > 0) {
+        toast.error('Выберите материалы для всех позиций');
+        return;
+      }
+
+      const invalidQuantities = shipItems.filter(item => item.quantity <= 0);
+      if (invalidQuantities.length > 0) {
+        toast.error('Укажите количество для всех позиций');
+        return;
+      }
+
+      try {
+        const response = await fetch(ORDERS_API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            free_shipment: true,
+            items: shipItems.map(item => ({
+              material_id: item.material_id,
+              color_id: item.color_id,
+              quantity: item.quantity,
+              is_defective: item.is_defective
+            })),
+            shipped_by: userId,
+            comment: shipmentComment
+          })
+        });
+
+        if (response.ok) {
+          toast.success('Материалы отправлены');
+          setIsFreeShipmentDialog(false);
+          onRefresh();
+        } else {
+          const error = await response.json();
+          toast.error(error.error || 'Ошибка отправки');
+        }
+      } catch (error) {
+        toast.error('Ошибка сервера');
+      }
+      return;
+    }
+
+    if (!selectedOrder) return;
 
     try {
       const response = await fetch(ORDERS_API, {
@@ -177,13 +271,21 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Icon name="PackageCheck" size={20} />
-              Готово к отправке
-            </CardTitle>
-            <CardDescription>
-              Исполненные заявки готовые к отправке
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Icon name="PackageCheck" size={20} />
+                  Готово к отправке
+                </CardTitle>
+                <CardDescription>
+                  Исполненные заявки готовые к отправке
+                </CardDescription>
+              </div>
+              <Button onClick={openFreeShipmentDialog} size="sm" variant="outline">
+                <Icon name="PackagePlus" size={16} className="mr-2" />
+                Отправить из остатков
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -417,6 +519,160 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
               Отправить и списать
             </Button>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1">
+              Отмена
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isFreeShipmentDialog} onOpenChange={setIsFreeShipmentDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Отправка из остатков</DialogTitle>
+            <DialogDescription>
+              Выберите материалы и укажите количество для отправки
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {shipItems.map((item, index) => {
+              const material = materials.find(m => m.id === item.material_id);
+              
+              return (
+                <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-sm">Позиция #{index + 1}</span>
+                      {shipItems.length > 1 && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => removeFreeShipmentItem(index)}
+                        >
+                          <Icon name="X" size={16} />
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-3">
+                      <div className="col-span-2">
+                        <Label className="text-xs mb-1">Материал *</Label>
+                        <Select
+                          value={String(item.material_id || '')}
+                          onValueChange={(value) => updateFreeShipmentItem(index, 'material_id', Number(value))}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Выберите материал" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {materials.map(m => (
+                              <SelectItem key={m.id} value={String(m.id)}>
+                                {m.name} (остаток: {m.quantity})
+                                {m.auto_deduct && ' 🔄'}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="text-xs mb-1">Цвет *</Label>
+                        <Select
+                          value={String(item.color_id || '')}
+                          onValueChange={(value) => updateFreeShipmentItem(index, 'color_id', Number(value))}
+                          disabled={!item.material_id}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Цвет" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {item.available_colors?.map(c => (
+                              <SelectItem key={c.id} value={String(c.id)}>
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className="w-3 h-3 rounded border"
+                                    style={{ backgroundColor: c.hex_code }}
+                                  />
+                                  {c.name}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="text-xs mb-1">Количество *</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={item.quantity || ''}
+                          onChange={(e) => updateFreeShipmentItem(index, 'quantity', parseInt(e.target.value) || 0)}
+                          className="h-9"
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        checked={item.is_defective}
+                        onCheckedChange={(checked) => updateFreeShipmentItem(index, 'is_defective', checked)}
+                        id={`free-defective-${index}`}
+                      />
+                      <Label htmlFor={`free-defective-${index}`} className="text-sm cursor-pointer">
+                        {item.is_defective ? (
+                          <span className="text-red-600 flex items-center gap-1">
+                            <Icon name="AlertTriangle" size={14} />
+                            Брак
+                          </span>
+                        ) : (
+                          <span className="text-gray-600">Годный материал</span>
+                        )}
+                      </Label>
+                      
+                      {item.auto_deduct && (
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded ml-auto">
+                          Автосписание включено
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            <Button onClick={addFreeShipmentItem} variant="outline" className="w-full">
+              <Icon name="Plus" size={16} className="mr-2" />
+              Добавить материал
+            </Button>
+
+            <div>
+              <Label className="text-sm mb-2">Комментарий</Label>
+              <Input
+                value={shipmentComment}
+                onChange={(e) => setShipmentComment(e.target.value)}
+                placeholder="Получатель, номер накладной и т.д."
+              />
+            </div>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
+            <p className="flex items-center gap-2 text-blue-900">
+              <Icon name="Info" size={16} />
+              <span>
+                Материалы с автосписанием будут списаны со склада автоматически. 
+                Бракованные материалы не списываются.
+              </span>
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <Button onClick={handleShip} className="flex-1">
+              <Icon name="Send" size={16} className="mr-2" />
+              Отправить
+            </Button>
+            <Button variant="outline" onClick={() => setIsFreeShipmentDialog(false)} className="flex-1">
               Отмена
             </Button>
           </div>

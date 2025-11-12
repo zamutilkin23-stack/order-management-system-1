@@ -96,6 +96,57 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         elif method == 'POST':
             body_data = json.loads(event.get('body', '{}'))
+            
+            if body_data.get('free_shipment'):
+                shipped_items = body_data.get('items', [])
+                shipped_by = body_data.get('shipped_by')
+                comment = body_data.get('comment', '')
+                
+                for item in shipped_items:
+                    material_id = item.get('material_id')
+                    color_id = item.get('color_id')
+                    quantity = item.get('quantity')
+                    is_defective = item.get('is_defective', False)
+                    
+                    cur.execute(
+                        """INSERT INTO free_shipments (material_id, color_id, quantity, is_defective, shipped_by, comment)
+                           VALUES (%s, %s, %s, %s, %s, %s)""",
+                        (material_id, color_id, quantity, is_defective, shipped_by, comment)
+                    )
+                    
+                    if not is_defective:
+                        cur.execute(
+                            "SELECT quantity, auto_deduct FROM materials WHERE id = %s",
+                            (material_id,)
+                        )
+                        material_row = cur.fetchone()
+                        
+                        if material_row and material_row['auto_deduct']:
+                            new_quantity = material_row['quantity'] - quantity
+                            cur.execute(
+                                "UPDATE materials SET quantity = %s WHERE id = %s",
+                                (new_quantity, material_id)
+                            )
+                            
+                            cur.execute(
+                                """INSERT INTO material_color_inventory (material_id, color_id, quantity)
+                                   VALUES (%s, %s, -%s)
+                                   ON CONFLICT (material_id, color_id)
+                                   DO UPDATE SET quantity = material_color_inventory.quantity - EXCLUDED.quantity""",
+                                (material_id, color_id, quantity)
+                            )
+                
+                conn.commit()
+                cur.close()
+                conn.close()
+                
+                return {
+                    'statusCode': 201,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'message': 'Materials shipped successfully'}),
+                    'isBase64Encoded': False
+                }
+            
             order_number = body_data.get('order_number')
             section_id = body_data.get('section_id')
             comment = body_data.get('comment', '')
@@ -206,16 +257,24 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         
                         if not is_defective:
                             cur.execute(
-                                "SELECT quantity FROM materials WHERE id = %s",
+                                "SELECT quantity, auto_deduct FROM materials WHERE id = %s",
                                 (material_id,)
                             )
                             material_row = cur.fetchone()
                             
-                            if material_row:
+                            if material_row and material_row['auto_deduct']:
                                 new_quantity = material_row['quantity'] - quantity
                                 cur.execute(
                                     "UPDATE materials SET quantity = %s WHERE id = %s",
                                     (new_quantity, material_id)
+                                )
+                                
+                                cur.execute(
+                                    """INSERT INTO material_color_inventory (material_id, color_id, quantity)
+                                       VALUES (%s, %s, -%s)
+                                       ON CONFLICT (material_id, color_id)
+                                       DO UPDATE SET quantity = material_color_inventory.quantity - EXCLUDED.quantity""",
+                                    (material_id, color_id, quantity)
                                 )
                     
                     cur.execute(
