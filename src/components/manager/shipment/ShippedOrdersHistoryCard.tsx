@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Icon from '@/components/ui/icon';
+import ShipmentDetailsDialog from './ShipmentDetailsDialog';
 
 interface Order {
   id: number;
@@ -40,6 +42,7 @@ interface ShippedOrdersHistoryCardProps {
   getSectionName: (id: number) => string;
   getMaterialName: (id: number) => string;
   getColorName: (id: number) => string;
+  getColorHex: (id: number) => string;
 }
 
 export default function ShippedOrdersHistoryCard({
@@ -49,8 +52,27 @@ export default function ShippedOrdersHistoryCard({
   setDateFilter,
   getSectionName,
   getMaterialName,
-  getColorName
+  getColorName,
+  getColorHex
 }: ShippedOrdersHistoryCardProps) {
+  const [detailsDialog, setDetailsDialog] = useState<{
+    open: boolean;
+    type: 'order' | 'free' | null;
+    orderData?: Order;
+    freeData?: FreeShipment;
+  }>({ open: false, type: null });
+
+  const openOrderDetails = (order: Order) => {
+    setDetailsDialog({ open: true, type: 'order', orderData: order });
+  };
+
+  const openFreeDetails = (shipment: FreeShipment) => {
+    setDetailsDialog({ open: true, type: 'free', freeData: shipment });
+  };
+
+  const closeDetails = () => {
+    setDetailsDialog({ open: false, type: null });
+  };
   const filterByDate = (date: string) => {
     const now = new Date();
     const itemDate = new Date(date);
@@ -128,7 +150,11 @@ export default function ShippedOrdersHistoryCard({
               if (shipment.type === 'order') {
                 const order = shipment.data as Order;
                 return (
-                  <div key={shipment.id} className="border rounded-lg p-4 bg-gradient-to-br from-blue-50 to-white">
+                  <div 
+                    key={shipment.id} 
+                    className="border rounded-lg p-4 bg-gradient-to-br from-blue-50 to-white cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => openOrderDetails(order)}
+                  >
                     <div className="flex items-start justify-between mb-2">
                       <div>
                         <h3 className="font-semibold">№ {order.order_number}</h3>
@@ -162,7 +188,11 @@ export default function ShippedOrdersHistoryCard({
               } else {
                 const free = shipment.data as FreeShipment;
                 return (
-                  <div key={shipment.id} className="border rounded-lg p-4 bg-gradient-to-br from-purple-50 to-white">
+                  <div 
+                    key={shipment.id} 
+                    className="border rounded-lg p-4 bg-gradient-to-br from-purple-50 to-white cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => openFreeDetails(free)}
+                  >
                     <div className="flex items-start justify-between mb-2">
                       <div>
                         <h3 className="font-semibold text-sm">{getMaterialName(free.material_id)}</h3>
@@ -193,6 +223,18 @@ export default function ShippedOrdersHistoryCard({
           )}
         </div>
       </CardContent>
+
+      <ShipmentDetailsDialog
+        isOpen={detailsDialog.open}
+        onOpenChange={(open) => !open && closeDetails()}
+        shipmentType={detailsDialog.type}
+        orderData={detailsDialog.orderData}
+        freeShipmentData={detailsDialog.freeData}
+        getSectionName={getSectionName}
+        getMaterialName={getMaterialName}
+        getColorName={getColorName}
+        getColorHex={getColorHex}
+      />
     </Card>
   );
 }
