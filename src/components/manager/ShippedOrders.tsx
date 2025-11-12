@@ -1,14 +1,10 @@
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TabsContent } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
+import CompletedOrdersCard from './shipment/CompletedOrdersCard';
+import ShippedOrdersHistoryCard from './shipment/ShippedOrdersHistoryCard';
+import OrderShipmentDialog from './shipment/OrderShipmentDialog';
+import FreeShipmentDialog from './shipment/FreeShipmentDialog';
 
 const ORDERS_API = 'https://functions.poehali.dev/0ffd935b-d2ee-48e1-a9e4-2b8fe0ffb3dd';
 
@@ -106,6 +102,7 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
   const getSectionName = (id: number) => sections.find(s => s.id === id)?.name || '—';
   const getMaterialName = (id: number) => materials.find(m => m.id === id)?.name || '—';
   const getColorName = (id: number) => colors.find(c => c.id === id)?.name || '—';
+  const getColorHex = (id: number) => colors.find(c => c.id === id)?.hex_code || '#000000';
 
   const openShipDialog = (order: Order) => {
     setShipmentMode('order');
@@ -266,418 +263,60 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
     setShipItems(newItems);
   };
 
+  const updateOrderShipmentColor = (index: number, colorId: number | null) => {
+    const newItems = [...shipItems];
+    newItems[index].color_id = colorId;
+    setShipItems(newItems);
+  };
+
   return (
     <TabsContent value="shipped">
       <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Icon name="PackageCheck" size={20} />
-                  Готово к отправке
-                </CardTitle>
-                <CardDescription>
-                  Исполненные заявки готовые к отправке
-                </CardDescription>
-              </div>
-              <Button onClick={openFreeShipmentDialog} size="sm" variant="outline">
-                <Icon name="PackagePlus" size={16} className="mr-2" />
-                Отправить из остатков
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {completedOrders.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Icon name="PackageOpen" size={48} className="mx-auto mb-3 opacity-50" />
-                  <p>Нет готовых заявок</p>
-                </div>
-              ) : (
-                completedOrders.map(order => (
-                  <div key={order.id} className="border rounded-lg p-4 bg-gradient-to-br from-green-50 to-white">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold text-lg">№ {order.order_number}</h3>
-                        <p className="text-sm text-gray-600">{getSectionName(order.section_id)}</p>
-                      </div>
-                      <Button onClick={() => openShipDialog(order)} size="sm">
-                        <Icon name="Send" size={16} className="mr-2" />
-                        Отправить
-                      </Button>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      {order.items.map(item => (
-                        <div key={item.id} className="flex items-center justify-between text-sm bg-white p-2 rounded border">
-                          <span>{getMaterialName(item.material_id)}</span>
-                          <span className="text-gray-600">{getColorName(item.color_id)}</span>
-                          <span className="font-medium">{item.quantity_completed} шт</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <CompletedOrdersCard
+          completedOrders={completedOrders}
+          getSectionName={getSectionName}
+          getMaterialName={getMaterialName}
+          getColorName={getColorName}
+          onOpenShipDialog={openShipDialog}
+          onOpenFreeShipmentDialog={openFreeShipmentDialog}
+        />
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Icon name="PackageCheck" size={20} className="text-blue-600" />
-                  Отправленные
-                </CardTitle>
-                <CardDescription>
-                  История отправленных заявок
-                </CardDescription>
-              </div>
-              
-              <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="w-44">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">За всё время</SelectItem>
-                  <SelectItem value="today">За сегодня</SelectItem>
-                  <SelectItem value="week">За неделю</SelectItem>
-                  <SelectItem value="month">За месяц</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {shippedOrders.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Icon name="Archive" size={48} className="mx-auto mb-3 opacity-50" />
-                  <p>Нет отправленных заявок</p>
-                  {dateFilter !== 'all' && (
-                    <p className="text-xs mt-2">за выбранный период</p>
-                  )}
-                </div>
-              ) : (
-                shippedOrders.map(order => (
-                  <div key={order.id} className="border rounded-lg p-4 bg-gradient-to-br from-blue-50 to-white">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="font-semibold">№ {order.order_number}</h3>
-                        <p className="text-xs text-gray-600">{getSectionName(order.section_id)}</p>
-                        {order.shipped_at && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            {new Date(order.shipped_at).toLocaleDateString('ru-RU', {
-                              day: 'numeric',
-                              month: 'short',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </p>
-                        )}
-                      </div>
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                        Отправлено
-                      </span>
-                    </div>
-                    
-                    <div className="space-y-1 text-xs">
-                      {order.items.map(item => (
-                        <div key={item.id} className="flex items-center justify-between text-gray-700">
-                          <span>{getMaterialName(item.material_id)}</span>
-                          <span>{item.quantity_completed} шт</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <ShippedOrdersHistoryCard
+          shippedOrders={shippedOrders}
+          dateFilter={dateFilter}
+          setDateFilter={setDateFilter}
+          getSectionName={getSectionName}
+          getMaterialName={getMaterialName}
+        />
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Отправка заявки № {selectedOrder?.order_number}</DialogTitle>
-            <DialogDescription>
-              Проверьте количество и отметьте бракованные материалы
-            </DialogDescription>
-          </DialogHeader>
+      <OrderShipmentDialog
+        isOpen={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        selectedOrder={selectedOrder}
+        shipItems={shipItems}
+        materials={materials}
+        getMaterialName={getMaterialName}
+        getColorName={getColorName}
+        getColorHex={getColorHex}
+        onUpdateQuantity={updateQuantity}
+        onToggleDefective={toggleDefective}
+        onShip={handleShip}
+        onUpdateColor={updateOrderShipmentColor}
+      />
 
-          <div className="space-y-4 py-4">
-            {shipItems.map((item, index) => {
-              const material = materials.find(m => m.id === item.material_id);
-              const needsColor = !item.color_id || item.color_id === 0;
-              
-              return (
-                <div key={index} className="border rounded-lg p-4 bg-gray-50">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <p className="font-medium text-sm mb-1">
-                          {getMaterialName(item.material_id)}
-                        </p>
-                        {needsColor && (
-                          <p className="text-xs text-orange-600 flex items-center gap-1">
-                            <Icon name="AlertCircle" size={12} />
-                            Требуется указать цвет
-                          </p>
-                        )}
-                      </div>
-                      {material?.auto_deduct && (
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-                          Автосписание
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <Label className="text-xs mb-1">Цвет *</Label>
-                        <Select
-                          value={String(item.color_id || '')}
-                          onValueChange={(value) => {
-                            const newItems = [...shipItems];
-                            newItems[index].color_id = value ? Number(value) : null;
-                            setShipItems(newItems);
-                          }}
-                        >
-                          <SelectTrigger className="h-9">
-                            <SelectValue placeholder="Выберите цвет" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {item.available_colors?.map(c => (
-                              <SelectItem key={c.id} value={String(c.id)}>
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    className="w-3 h-3 rounded border"
-                                    style={{ backgroundColor: c.hex_code }}
-                                  />
-                                  {c.name}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label className="text-xs mb-1">Количество</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={item.quantity}
-                          onChange={(e) => updateQuantity(index, parseInt(e.target.value) || 0)}
-                          className="h-9"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-5">
-                        <Checkbox
-                          checked={item.is_defective}
-                          onCheckedChange={() => toggleDefective(index)}
-                          id={`defective-${index}`}
-                        />
-                        <Label 
-                          htmlFor={`defective-${index}`}
-                          className="text-sm cursor-pointer"
-                        >
-                          {item.is_defective ? (
-                            <span className="text-red-600 flex items-center gap-1">
-                              <Icon name="AlertTriangle" size={14} />
-                              Брак
-                            </span>
-                          ) : (
-                            <span className="text-gray-600">Годный</span>
-                          )}
-                        </Label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
-            <p className="flex items-center gap-2 text-blue-900">
-              <Icon name="Info" size={16} />
-              <span>
-                Годные материалы будут автоматически списаны со склада. 
-                Бракованные материалы списываться не будут.
-              </span>
-            </p>
-          </div>
-
-          <div className="flex gap-2">
-            <Button onClick={handleShip} className="flex-1">
-              <Icon name="Send" size={16} className="mr-2" />
-              Отправить и списать
-            </Button>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1">
-              Отмена
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isFreeShipmentDialog} onOpenChange={setIsFreeShipmentDialog}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Отправка из остатков</DialogTitle>
-            <DialogDescription>
-              Выберите материалы и укажите количество для отправки
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            {shipItems.map((item, index) => {
-              const material = materials.find(m => m.id === item.material_id);
-              
-              return (
-                <div key={index} className="border rounded-lg p-4 bg-gray-50">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-sm">Позиция #{index + 1}</span>
-                      {shipItems.length > 1 && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => removeFreeShipmentItem(index)}
-                        >
-                          <Icon name="X" size={16} />
-                        </Button>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-3">
-                      <div className="col-span-2">
-                        <Label className="text-xs mb-1">Материал *</Label>
-                        <Select
-                          value={String(item.material_id || '')}
-                          onValueChange={(value) => updateFreeShipmentItem(index, 'material_id', Number(value))}
-                        >
-                          <SelectTrigger className="h-9">
-                            <SelectValue placeholder="Выберите материал" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {materials.map(m => (
-                              <SelectItem key={m.id} value={String(m.id)}>
-                                {m.name} (остаток: {m.quantity})
-                                {m.auto_deduct && ' 🔄'}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label className="text-xs mb-1">Цвет *</Label>
-                        <Select
-                          value={String(item.color_id || '')}
-                          onValueChange={(value) => updateFreeShipmentItem(index, 'color_id', Number(value))}
-                          disabled={!item.material_id}
-                        >
-                          <SelectTrigger className="h-9">
-                            <SelectValue placeholder="Цвет" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {item.available_colors?.map(c => (
-                              <SelectItem key={c.id} value={String(c.id)}>
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    className="w-3 h-3 rounded border"
-                                    style={{ backgroundColor: c.hex_code }}
-                                  />
-                                  {c.name}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label className="text-xs mb-1">Количество *</Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity || ''}
-                          onChange={(e) => updateFreeShipmentItem(index, 'quantity', parseInt(e.target.value) || 0)}
-                          className="h-9"
-                          placeholder="0"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <Checkbox
-                        checked={item.is_defective}
-                        onCheckedChange={(checked) => updateFreeShipmentItem(index, 'is_defective', checked)}
-                        id={`free-defective-${index}`}
-                      />
-                      <Label htmlFor={`free-defective-${index}`} className="text-sm cursor-pointer">
-                        {item.is_defective ? (
-                          <span className="text-red-600 flex items-center gap-1">
-                            <Icon name="AlertTriangle" size={14} />
-                            Брак
-                          </span>
-                        ) : (
-                          <span className="text-gray-600">Годный материал</span>
-                        )}
-                      </Label>
-                      
-                      {item.auto_deduct && (
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded ml-auto">
-                          Автосписание включено
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            <Button onClick={addFreeShipmentItem} variant="outline" className="w-full">
-              <Icon name="Plus" size={16} className="mr-2" />
-              Добавить материал
-            </Button>
-
-            <div>
-              <Label className="text-sm mb-2">Комментарий</Label>
-              <Input
-                value={shipmentComment}
-                onChange={(e) => setShipmentComment(e.target.value)}
-                placeholder="Получатель, номер накладной и т.д."
-              />
-            </div>
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
-            <p className="flex items-center gap-2 text-blue-900">
-              <Icon name="Info" size={16} />
-              <span>
-                Материалы с автосписанием будут списаны со склада автоматически. 
-                Бракованные материалы не списываются.
-              </span>
-            </p>
-          </div>
-
-          <div className="flex gap-2">
-            <Button onClick={handleShip} className="flex-1">
-              <Icon name="Send" size={16} className="mr-2" />
-              Отправить
-            </Button>
-            <Button variant="outline" onClick={() => setIsFreeShipmentDialog(false)} className="flex-1">
-              Отмена
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <FreeShipmentDialog
+        isOpen={isFreeShipmentDialog}
+        onOpenChange={setIsFreeShipmentDialog}
+        shipItems={shipItems}
+        materials={materials}
+        shipmentComment={shipmentComment}
+        onCommentChange={setShipmentComment}
+        onUpdateItem={updateFreeShipmentItem}
+        onAddItem={addFreeShipmentItem}
+        onRemoveItem={removeFreeShipmentItem}
+        onShip={handleShip}
+      />
     </TabsContent>
   );
 }
