@@ -319,6 +319,7 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
           getMaterialName={getMaterialName}
           getColorName={getColorName}
           getColorHex={getColorHex}
+          onRefresh={onRefresh}
         />
       </div>
 

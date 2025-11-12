@@ -331,6 +331,47 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         elif method == 'DELETE':
             params = event.get('queryStringParameters') or {}
             order_id = params.get('id')
+            shipment_id = params.get('shipment_id')
+            shipment_type = params.get('type')
+            
+            if shipment_id and shipment_type:
+                if shipment_type == 'free':
+                    cur.execute("DELETE FROM free_shipments WHERE id = %s", (shipment_id,))
+                    conn.commit()
+                    cur.close()
+                    conn.close()
+                    
+                    return {
+                        'statusCode': 200,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'success': True, 'message': 'Свободная отправка удалена'}),
+                        'isBase64Encoded': False
+                    }
+                elif shipment_type == 'order':
+                    cur.execute("SELECT order_id FROM shipped_orders WHERE order_id = %s LIMIT 1", (shipment_id,))
+                    shipped_order = cur.fetchone()
+                    
+                    if shipped_order:
+                        shipped_order_id = shipped_order['order_id']
+                        cur.execute("DELETE FROM shipped_orders WHERE order_id = %s", (shipped_order_id,))
+                        cur.execute("UPDATE orders SET status = 'completed', shipped_at = NULL WHERE id = %s", (shipped_order_id,))
+                        conn.commit()
+                        cur.close()
+                        conn.close()
+                        
+                        return {
+                            'statusCode': 200,
+                            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                            'body': json.dumps({'success': True, 'message': 'Отправка удалена, заявка возвращена в статус исполнена'}),
+                            'isBase64Encoded': False
+                        }
+                
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Неверный тип отправки'}),
+                    'isBase64Encoded': False
+                }
             
             if not order_id:
                 return {

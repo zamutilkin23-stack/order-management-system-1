@@ -1,4 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useState } from 'react';
 import Icon from '@/components/ui/icon';
 
 interface Order {
@@ -41,6 +44,7 @@ interface ShipmentDetailsDialogProps {
   getMaterialName: (id: number) => string;
   getColorName: (id: number) => string;
   getColorHex: (id: number) => string;
+  onDelete?: (type: 'order' | 'free', id: number) => Promise<void>;
 }
 
 export default function ShipmentDetailsDialog({
@@ -52,8 +56,12 @@ export default function ShipmentDetailsDialog({
   getSectionName,
   getMaterialName,
   getColorName,
-  getColorHex
+  getColorHex,
+  onDelete
 }: ShipmentDetailsDialogProps) {
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   if (!shipmentType) return null;
 
   const formatDate = (dateString: string) => {
@@ -64,6 +72,29 @@ export default function ShipmentDetailsDialog({
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const handleDeleteClick = () => {
+    setShowDeleteAlert(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!onDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      if (shipmentType === 'order' && orderData) {
+        await onDelete('order', orderData.id);
+      } else if (shipmentType === 'free' && freeShipmentData) {
+        await onDelete('free', freeShipmentData.id);
+      }
+      setShowDeleteAlert(false);
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Delete error:', error);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -210,7 +241,46 @@ export default function ShipmentDetailsDialog({
             }
           </p>
         </div>
+
+        {onDelete && (
+          <div className="flex justify-end pt-4 border-t">
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteClick}
+              className="gap-2"
+            >
+              <Icon name="Trash2" size={16} />
+              Удалить отправку
+            </Button>
+          </div>
+        )}
       </DialogContent>
+
+      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить отправку?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {shipmentType === 'order' 
+                ? 'Отправленная заявка будет удалена, заявка вернется в статус "Исполнена". Материалы НЕ будут возвращены на склад.'
+                : 'Свободная отправка будет удалена. Материалы НЕ будут возвращены на склад.'
+              }
+              <br /><br />
+              Это действие нельзя отменить.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Отмена</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? 'Удаление...' : 'Удалить'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

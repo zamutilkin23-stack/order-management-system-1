@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
 import Icon from '@/components/ui/icon';
 import ShipmentDetailsDialog from './ShipmentDetailsDialog';
+
+const ORDERS_API = 'https://functions.poehali.dev/0ffd935b-d2ee-48e1-a9e4-2b8fe0ffb3dd';
 
 interface Order {
   id: number;
@@ -43,6 +46,7 @@ interface ShippedOrdersHistoryCardProps {
   getMaterialName: (id: number) => string;
   getColorName: (id: number) => string;
   getColorHex: (id: number) => string;
+  onRefresh: () => void;
 }
 
 export default function ShippedOrdersHistoryCard({
@@ -53,7 +57,8 @@ export default function ShippedOrdersHistoryCard({
   getSectionName,
   getMaterialName,
   getColorName,
-  getColorHex
+  getColorHex,
+  onRefresh
 }: ShippedOrdersHistoryCardProps) {
   const [detailsDialog, setDetailsDialog] = useState<{
     open: boolean;
@@ -72,6 +77,26 @@ export default function ShippedOrdersHistoryCard({
 
   const closeDetails = () => {
     setDetailsDialog({ open: false, type: null });
+  };
+
+  const handleDelete = async (type: 'order' | 'free', id: number) => {
+    try {
+      const response = await fetch(`${ORDERS_API}?shipment_id=${id}&type=${type}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        toast.success(result.message || 'Отправка удалена');
+        onRefresh();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Ошибка удаления');
+      }
+    } catch (error) {
+      toast.error('Ошибка сервера');
+      console.error('Delete error:', error);
+    }
   };
   const filterByDate = (date: string) => {
     const now = new Date();
@@ -234,6 +259,7 @@ export default function ShippedOrdersHistoryCard({
         getMaterialName={getMaterialName}
         getColorName={getColorName}
         getColorHex={getColorHex}
+        onDelete={handleDelete}
       />
     </Card>
   );
