@@ -98,6 +98,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                             (mat['id'],)
                         )
                         mat_dict['colors'] = [dict(row) for row in cur.fetchall()]
+                        
+                        cur.execute(
+                            """SELECT mci.color_id, mci.quantity, c.name as color_name, c.hex_code
+                               FROM material_color_inventory mci
+                               JOIN colors c ON c.id = mci.color_id
+                               WHERE mci.material_id = %s AND mci.quantity > 0
+                               ORDER BY c.name""",
+                            (mat['id'],)
+                        )
+                        mat_dict['color_inventory'] = [dict(row) for row in cur.fetchall()]
                         result.append(mat_dict)
             
             cur.close()
@@ -304,6 +314,28 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         cur.execute(
                             "INSERT INTO shipments (material_id, color_id, quantity, recipient, comment) VALUES (%s, %s, %s, %s, %s)",
                             (resource_id, color_id, quantity, recipient, comment)
+                        )
+                        
+                        cur.execute(
+                            """INSERT INTO material_color_inventory (material_id, color_id, quantity)
+                               VALUES (%s, %s, -%s)
+                               ON CONFLICT (material_id, color_id)
+                               DO UPDATE SET quantity = material_color_inventory.quantity - EXCLUDED.quantity""",
+                            (resource_id, color_id, quantity)
+                        )
+                    
+                    if body_data.get('color_id'):
+                        color_id = body_data.get('color_id')
+                        quantity_change = body_data['quantity_change']
+                        
+                        cur.execute(
+                            """INSERT INTO material_color_inventory (material_id, color_id, quantity)
+                               VALUES (%s, %s, %s)
+                               ON CONFLICT (material_id, color_id)
+                               DO UPDATE SET 
+                                   quantity = material_color_inventory.quantity + EXCLUDED.quantity,
+                                   updated_at = NOW()""",
+                            (resource_id, color_id, quantity_change)
                         )
                 
                 if updates:

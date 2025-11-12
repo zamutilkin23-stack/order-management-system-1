@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,6 +17,13 @@ interface Material {
   section_id: number;
   quantity: number;
   colors: Color[];
+  color_inventory?: Array<{
+    color_id: number;
+    quantity: number;
+    color_name: string;
+    hex_code: string;
+  }>;
+  auto_deduct?: boolean;
 }
 
 interface Section {
@@ -115,10 +122,16 @@ export default function MaterialsInventory({
 
   const getSectionName = (id: number) => sections.find(s => s.id === id)?.name || '—';
 
-  const filteredMaterials = materials.filter(m => {
-    if (sectionFilter === 'all') return true;
-    return m.section_id === Number(sectionFilter);
-  });
+  const filteredMaterials = materials
+    .filter(m => {
+      if (sectionFilter === 'all') return true;
+      return m.section_id === Number(sectionFilter);
+    })
+    .sort((a, b) => {
+      const sectionCompare = a.section_id - b.section_id;
+      if (sectionCompare !== 0) return sectionCompare;
+      return a.name.localeCompare(b.name);
+    });
 
   const printInventory = () => {
     const printContent = `
@@ -209,33 +222,65 @@ export default function MaterialsInventory({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredMaterials.map((material) => (
-                <TableRow key={material.id} className={cn(material.quantity < 10 && 'bg-red-50')}>
-                  <TableCell className="font-medium">{material.name}</TableCell>
-                  <TableCell>{getSectionName(material.section_id)}</TableCell>
-                  <TableCell className={cn('text-right font-mono text-lg', material.quantity < 10 && 'text-red-600 font-bold')}>
-                    {material.quantity}
-                  </TableCell>
-                  <TableCell className="text-right space-x-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleQuantityChange(material.id)}
-                    >
-                      <Icon name="Edit" size={14} className="mr-1" />
-                      Изменить
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => openShipDialog(material)}
-                    >
-                      <Icon name="Send" size={14} className="mr-1" />
-                      Отправить
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {filteredMaterials.map((material) => {
+                const hasColorInventory = material.color_inventory && material.color_inventory.length > 0;
+                
+                return (
+                  <React.Fragment key={material.id}>
+                    <TableRow className={cn(material.quantity < 10 && 'bg-red-50')}>
+                      <TableCell className="font-medium">
+                        {material.name}
+                        {material.auto_deduct && (
+                          <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                            Автосписание
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>{getSectionName(material.section_id)}</TableCell>
+                      <TableCell className={cn('text-right font-mono text-lg', material.quantity < 10 && 'text-red-600 font-bold')}>
+                        {material.quantity}
+                      </TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleQuantityChange(material.id)}
+                        >
+                          <Icon name="Edit" size={14} className="mr-1" />
+                          Изменить
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => openShipDialog(material)}
+                        >
+                          <Icon name="Send" size={14} className="mr-1" />
+                          Отправить
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                    {hasColorInventory && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="bg-gray-50 py-2">
+                          <div className="flex items-center gap-3 pl-8 text-sm">
+                            <span className="text-gray-600">По цветам:</span>
+                            {material.color_inventory.map((ci: any) => (
+                              <div key={ci.color_id} className="flex items-center gap-1.5 bg-white px-2 py-1 rounded border">
+                                <div
+                                  className="w-3 h-3 rounded border"
+                                  style={{ backgroundColor: ci.hex_code }}
+                                />
+                                <span className="text-gray-700">{ci.color_name}:</span>
+                                <span className="font-medium">{ci.quantity} шт</span>
+                              </div>
+                            ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>

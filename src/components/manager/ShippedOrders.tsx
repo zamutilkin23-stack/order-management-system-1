@@ -64,6 +64,8 @@ interface ShipItem {
   color_id: number | null;
   quantity: number;
   is_defective: boolean;
+  available_colors?: Color[];
+  auto_deduct?: boolean;
 }
 
 export default function ShippedOrders({ orders, materials, sections, colors, userId, onRefresh }: ShippedOrdersProps) {
@@ -103,17 +105,29 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
 
   const openShipDialog = (order: Order) => {
     setSelectedOrder(order);
-    setShipItems(order.items.map(item => ({
-      material_id: item.material_id,
-      color_id: item.color_id,
-      quantity: item.quantity_completed,
-      is_defective: false
-    })));
+    setShipItems(order.items.map(item => {
+      const material = materials.find(m => m.id === item.material_id);
+      const hasColor = item.color_id && item.color_id > 0;
+      return {
+        material_id: item.material_id,
+        color_id: hasColor ? item.color_id : null,
+        quantity: item.quantity_completed,
+        is_defective: false,
+        available_colors: material?.colors || [],
+        auto_deduct: material?.auto_deduct || false
+      };
+    }));
     setIsDialogOpen(true);
   };
 
   const handleShip = async () => {
     if (!selectedOrder) return;
+
+    const missingColors = shipItems.filter(item => !item.color_id || item.color_id === 0);
+    if (missingColors.length > 0) {
+      toast.error('Укажите цвет для всех материалов');
+      return;
+    }
 
     try {
       const response = await fetch(ORDERS_API, {
@@ -122,7 +136,12 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
         body: JSON.stringify({
           id: selectedOrder.id,
           status: 'shipped',
-          shipped_items: shipItems,
+          shipped_items: shipItems.map(item => ({
+            material_id: item.material_id,
+            color_id: item.color_id,
+            quantity: item.quantity,
+            is_defective: item.is_defective
+          })),
           shipped_by: userId
         })
       });
@@ -288,52 +307,98 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {shipItems.map((item, index) => (
-              <div key={index} className="border rounded-lg p-4 bg-gray-50">
-                <div className="grid grid-cols-3 gap-4 items-center">
-                  <div>
-                    <p className="font-medium text-sm mb-1">
-                      {getMaterialName(item.material_id)}
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      {getColorName(item.color_id || 0)}
-                    </p>
-                  </div>
-
-                  <div>
-                    <Label className="text-xs mb-1">Количество</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={item.quantity}
-                      onChange={(e) => updateQuantity(index, parseInt(e.target.value) || 0)}
-                      className="h-9"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      checked={item.is_defective}
-                      onCheckedChange={() => toggleDefective(index)}
-                      id={`defective-${index}`}
-                    />
-                    <Label 
-                      htmlFor={`defective-${index}`}
-                      className="text-sm cursor-pointer"
-                    >
-                      {item.is_defective ? (
-                        <span className="text-red-600 flex items-center gap-1">
-                          <Icon name="AlertTriangle" size={14} />
-                          Брак
+            {shipItems.map((item, index) => {
+              const material = materials.find(m => m.id === item.material_id);
+              const needsColor = !item.color_id || item.color_id === 0;
+              
+              return (
+                <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm mb-1">
+                          {getMaterialName(item.material_id)}
+                        </p>
+                        {needsColor && (
+                          <p className="text-xs text-orange-600 flex items-center gap-1">
+                            <Icon name="AlertCircle" size={12} />
+                            Требуется указать цвет
+                          </p>
+                        )}
+                      </div>
+                      {material?.auto_deduct && (
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                          Автосписание
                         </span>
-                      ) : (
-                        <span className="text-gray-600">Годный</span>
                       )}
-                    </Label>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs mb-1">Цвет *</Label>
+                        <Select
+                          value={String(item.color_id || '')}
+                          onValueChange={(value) => {
+                            const newItems = [...shipItems];
+                            newItems[index].color_id = value ? Number(value) : null;
+                            setShipItems(newItems);
+                          }}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Выберите цвет" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {item.available_colors?.map(c => (
+                              <SelectItem key={c.id} value={String(c.id)}>
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className="w-3 h-3 rounded border"
+                                    style={{ backgroundColor: c.hex_code }}
+                                  />
+                                  {c.name}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="text-xs mb-1">Количество</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={item.quantity}
+                          onChange={(e) => updateQuantity(index, parseInt(e.target.value) || 0)}
+                          className="h-9"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-5">
+                        <Checkbox
+                          checked={item.is_defective}
+                          onCheckedChange={() => toggleDefective(index)}
+                          id={`defective-${index}`}
+                        />
+                        <Label 
+                          htmlFor={`defective-${index}`}
+                          className="text-sm cursor-pointer"
+                        >
+                          {item.is_defective ? (
+                            <span className="text-red-600 flex items-center gap-1">
+                              <Icon name="AlertTriangle" size={14} />
+                              Брак
+                            </span>
+                          ) : (
+                            <span className="text-gray-600">Годный</span>
+                          )}
+                        </Label>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
