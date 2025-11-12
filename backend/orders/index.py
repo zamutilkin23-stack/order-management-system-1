@@ -336,6 +336,37 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             if shipment_id and shipment_type:
                 if shipment_type == 'free':
+                    cur.execute(
+                        "SELECT material_id, color_id, quantity, is_defective FROM free_shipments WHERE id = %s",
+                        (shipment_id,)
+                    )
+                    shipment = cur.fetchone()
+                    
+                    if shipment and not shipment['is_defective']:
+                        material_id = shipment['material_id']
+                        color_id = shipment['color_id']
+                        quantity = shipment['quantity']
+                        
+                        cur.execute(
+                            "SELECT auto_deduct FROM materials WHERE id = %s",
+                            (material_id,)
+                        )
+                        material = cur.fetchone()
+                        
+                        if material and material['auto_deduct']:
+                            cur.execute(
+                                "UPDATE materials SET quantity = quantity + %s WHERE id = %s",
+                                (quantity, material_id)
+                            )
+                            
+                            cur.execute(
+                                """INSERT INTO material_color_inventory (material_id, color_id, quantity)
+                                   VALUES (%s, %s, %s)
+                                   ON CONFLICT (material_id, color_id)
+                                   DO UPDATE SET quantity = material_color_inventory.quantity + EXCLUDED.quantity""",
+                                (material_id, color_id, quantity)
+                            )
+                    
                     cur.execute("DELETE FROM free_shipments WHERE id = %s", (shipment_id,))
                     conn.commit()
                     cur.close()
@@ -344,7 +375,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     return {
                         'statusCode': 200,
                         'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                        'body': json.dumps({'success': True, 'message': 'Свободная отправка удалена'}),
+                        'body': json.dumps({'success': True, 'message': 'Свободная отправка удалена, материалы возвращены на склад'}),
                         'isBase64Encoded': False
                     }
                 elif shipment_type == 'order':
@@ -353,6 +384,39 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     
                     if shipped_order:
                         shipped_order_id = shipped_order['order_id']
+                        
+                        cur.execute(
+                            "SELECT material_id, color_id, quantity, is_defective FROM shipped_orders WHERE order_id = %s",
+                            (shipped_order_id,)
+                        )
+                        shipped_items = cur.fetchall()
+                        
+                        for item in shipped_items:
+                            if not item['is_defective']:
+                                material_id = item['material_id']
+                                color_id = item['color_id']
+                                quantity = item['quantity']
+                                
+                                cur.execute(
+                                    "SELECT auto_deduct FROM materials WHERE id = %s",
+                                    (material_id,)
+                                )
+                                material = cur.fetchone()
+                                
+                                if material and material['auto_deduct']:
+                                    cur.execute(
+                                        "UPDATE materials SET quantity = quantity + %s WHERE id = %s",
+                                        (quantity, material_id)
+                                    )
+                                    
+                                    cur.execute(
+                                        """INSERT INTO material_color_inventory (material_id, color_id, quantity)
+                                           VALUES (%s, %s, %s)
+                                           ON CONFLICT (material_id, color_id)
+                                           DO UPDATE SET quantity = material_color_inventory.quantity + EXCLUDED.quantity""",
+                                        (material_id, color_id, quantity)
+                                    )
+                        
                         cur.execute("DELETE FROM shipped_orders WHERE order_id = %s", (shipped_order_id,))
                         cur.execute("UPDATE orders SET status = 'completed', shipped_at = NULL WHERE id = %s", (shipped_order_id,))
                         conn.commit()
@@ -362,7 +426,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         return {
                             'statusCode': 200,
                             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                            'body': json.dumps({'success': True, 'message': 'Отправка удалена, заявка возвращена в статус исполнена'}),
+                            'body': json.dumps({'success': True, 'message': 'Отправка удалена, материалы возвращены на склад'}),
                             'isBase64Encoded': False
                         }
                 
