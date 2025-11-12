@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import CompletedOrdersCard from './shipment/CompletedOrdersCard';
@@ -65,6 +65,17 @@ interface ShipItem {
   auto_deduct?: boolean;
 }
 
+interface FreeShipment {
+  id: number;
+  material_id: number;
+  color_id: number;
+  quantity: number;
+  is_defective: boolean;
+  shipped_by: number;
+  comment: string;
+  shipped_at: string;
+}
+
 export default function ShippedOrders({ orders, materials, sections, colors, userId, onRefresh }: ShippedOrdersProps) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [shipItems, setShipItems] = useState<ShipItem[]>([]);
@@ -73,6 +84,23 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
   const [dateFilter, setDateFilter] = useState('all');
   const [shipmentComment, setShipmentComment] = useState('');
   const [shipmentMode, setShipmentMode] = useState<'order' | 'free'>('order');
+  const [freeShipments, setFreeShipments] = useState<FreeShipment[]>([]);
+
+  useEffect(() => {
+    loadFreeShipments();
+  }, []);
+
+  const loadFreeShipments = async () => {
+    try {
+      const response = await fetch(`${ORDERS_API}?get_free_shipments=true`);
+      if (response.ok) {
+        const data = await response.json();
+        setFreeShipments(data);
+      }
+    } catch (error) {
+      console.error('Error loading free shipments:', error);
+    }
+  };
 
   const completedOrders = orders.filter(o => o.status === 'completed');
   
@@ -207,6 +235,7 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
         if (response.ok) {
           toast.success('Материалы отправлены');
           setIsFreeShipmentDialog(false);
+          loadFreeShipments();
           onRefresh();
         } else {
           const error = await response.json();
@@ -283,10 +312,12 @@ export default function ShippedOrders({ orders, materials, sections, colors, use
 
         <ShippedOrdersHistoryCard
           shippedOrders={shippedOrders}
+          freeShipments={freeShipments}
           dateFilter={dateFilter}
           setDateFilter={setDateFilter}
           getSectionName={getSectionName}
           getMaterialName={getMaterialName}
+          getColorName={getColorName}
         />
       </div>
 

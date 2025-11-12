@@ -36,8 +36,25 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             order_id = params.get('id')
             status_filter = params.get('status')
             get_shipped = params.get('get_shipped')
+            get_free_shipments = params.get('get_free_shipments')
             
-            if get_shipped:
+            if get_free_shipments:
+                cur.execute("""
+                    SELECT 
+                        id,
+                        material_id,
+                        color_id,
+                        quantity,
+                        is_defective,
+                        shipped_by,
+                        comment,
+                        shipped_at
+                    FROM free_shipments
+                    ORDER BY shipped_at DESC
+                """)
+                free_shipments = cur.fetchall()
+                result = [dict(item) for item in free_shipments]
+            elif get_shipped:
                 cur.execute("""
                     SELECT 
                         so.id,
