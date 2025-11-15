@@ -76,6 +76,7 @@ export default function OrdersSection({
     order_number: '',
     section_id: '',
     comment: '',
+    auto_deduct: true,
     items: [{ material_id: '', color_id: '', quantity_required: 0 }]
   });
 
@@ -88,6 +89,7 @@ export default function OrdersSection({
       order_number: formData.order_number,
       section_id: Number(formData.section_id),
       comment: formData.comment,
+      auto_deduct: formData.auto_deduct,
       items: formData.items.map(item => ({
         material_id: Number(item.material_id),
         color_id: Number(item.color_id) || null,
@@ -101,6 +103,7 @@ export default function OrdersSection({
         order_number: '',
         section_id: '',
         comment: '',
+        auto_deduct: true,
         items: [{ material_id: '', color_id: '', quantity_required: 0 }]
       });
     }
@@ -269,6 +272,19 @@ export default function OrdersSection({
                         onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
                         placeholder="Дополнительная информация"
                       />
+                    </div>
+
+                    <div className="flex items-center space-x-2 border rounded-lg p-3 bg-muted/30">
+                      <input
+                        type="checkbox"
+                        id="auto_deduct"
+                        checked={formData.auto_deduct}
+                        onChange={(e) => setFormData({ ...formData, auto_deduct: e.target.checked })}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <Label htmlFor="auto_deduct" className="text-sm font-normal cursor-pointer">
+                        Списать материалы автоматически при отгрузке
+                      </Label>
                     </div>
 
                     <div className="border-t pt-4">

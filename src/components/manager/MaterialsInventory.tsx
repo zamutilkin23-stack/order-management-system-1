@@ -62,12 +62,66 @@ export default function MaterialsInventory({
 
   const SHIPMENTS_API = '/api/materials';
 
+  const [manualDeductDialog, setManualDeductDialog] = useState(false);
+  const [deductMaterial, setDeductMaterial] = useState<Material | null>(null);
+  const [deductFormData, setDeductFormData] = useState({
+    color_id: '',
+    quantity: 0,
+    comment: ''
+  });
+
   const handleQuantityChange = (materialId: number) => {
     const amount = prompt('Введите количество для добавления (отрицательное для списания):');
     if (amount) {
       const change = Number(amount);
       const comment = prompt('Комментарий (необязательно):') || '';
       onUpdateQuantity(materialId, change, comment);
+    }
+  };
+
+  const openManualDeductDialog = (material: Material) => {
+    setDeductMaterial(material);
+    setDeductFormData({
+      color_id: '',
+      quantity: 0,
+      comment: ''
+    });
+    setManualDeductDialog(true);
+  };
+
+  const handleManualDeduct = async () => {
+    if (!deductMaterial || deductFormData.quantity <= 0) {
+      toast.error('Укажите количество');
+      return;
+    }
+
+    if (deductFormData.quantity > deductMaterial.quantity) {
+      toast.error('Недостаточно материала на складе');
+      return;
+    }
+
+    try {
+      const response = await fetch(SHIPMENTS_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: deductMaterial.id,
+          quantity_change: -deductFormData.quantity,
+          comment: `Ручное списание: ${deductFormData.comment}`,
+          color_id: deductFormData.color_id ? Number(deductFormData.color_id) : null
+        })
+      });
+
+      if (response.ok) {
+        toast.success('Материал списан');
+        setManualDeductDialog(false);
+        onRefresh();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Ошибка списания');
+      }
+    } catch (error) {
+      toast.error('Ошибка сервера');
     }
   };
 
@@ -251,6 +305,14 @@ export default function MaterialsInventory({
                         </Button>
                         <Button
                           size="sm"
+                          variant="secondary"
+                          onClick={() => openManualDeductDialog(material)}
+                        >
+                          <Icon name="Minus" size={14} className="mr-1" />
+                          Списать
+                        </Button>
+                        <Button
+                          size="sm"
                           variant="default"
                           onClick={() => openShipDialog(material)}
                         >
@@ -355,6 +417,75 @@ export default function MaterialsInventory({
                 Отправить
               </Button>
               <Button variant="outline" onClick={() => setShipDialogOpen(false)}>
+                Отмена
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={manualDeductDialog} onOpenChange={setManualDeductDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ручное списание материала</DialogTitle>
+            <DialogDescription>
+              {deductMaterial?.name} (доступно: {deductMaterial?.quantity} шт)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {deductMaterial?.colors && deductMaterial.colors.length > 0 && (
+              <div>
+                <Label>Цвет (необязательно)</Label>
+                <Select
+                  value={deductFormData.color_id}
+                  onValueChange={(value) => setDeductFormData({ ...deductFormData, color_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Не указан" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Не указан</SelectItem>
+                    {deductMaterial.colors.map(c => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-4 h-4 rounded border"
+                            style={{ backgroundColor: c.hex_code }}
+                          />
+                          {c.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div>
+              <Label>Количество *</Label>
+              <Input
+                type="number"
+                value={deductFormData.quantity || ''}
+                onChange={(e) => setDeductFormData({ ...deductFormData, quantity: Number(e.target.value) })}
+                placeholder="0"
+                min="0"
+              />
+            </div>
+
+            <div>
+              <Label>Комментарий</Label>
+              <Input
+                value={deductFormData.comment}
+                onChange={(e) => setDeductFormData({ ...deductFormData, comment: e.target.value })}
+                placeholder="Причина списания"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button onClick={handleManualDeduct} className="flex-1" variant="destructive">
+                Списать
+              </Button>
+              <Button variant="outline" onClick={() => setManualDeductDialog(false)}>
                 Отмена
               </Button>
             </div>

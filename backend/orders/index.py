@@ -168,6 +168,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             section_id = body_data.get('section_id')
             comment = body_data.get('comment', '')
             created_by = body_data.get('created_by')
+            auto_deduct = body_data.get('auto_deduct', True)
             items = body_data.get('items', [])
             
             if not all([order_number, items]):
@@ -179,9 +180,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 }
             
             cur.execute(
-                """INSERT INTO orders (order_number, section_id, comment, created_by, status) 
-                   VALUES (%s, %s, %s, %s, 'new') RETURNING *""",
-                (order_number, section_id, comment, created_by)
+                """INSERT INTO orders (order_number, section_id, comment, created_by, status, auto_deduct) 
+                   VALUES (%s, %s, %s, %s, 'new', %s) RETURNING *""",
+                (order_number, section_id, comment, created_by, auto_deduct)
             )
             order = cur.fetchone()
             order_id = order['id']
@@ -260,6 +261,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     shipped_items = body_data.get('shipped_items', [])
                     shipped_by = body_data.get('shipped_by')
                     
+                    cur.execute("SELECT auto_deduct FROM orders WHERE id = %s", (order_id,))
+                    order_row = cur.fetchone()
+                    order_auto_deduct = order_row['auto_deduct'] if order_row else True
+                    
                     for item in shipped_items:
                         material_id = item.get('material_id')
                         color_id = item.get('color_id')
@@ -272,7 +277,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                             (order_id, material_id, color_id, quantity, is_defective, shipped_by)
                         )
                         
-                        if not is_defective:
+                        if not is_defective and order_auto_deduct:
                             cur.execute(
                                 "SELECT quantity, auto_deduct FROM materials WHERE id = %s",
                                 (material_id,)
