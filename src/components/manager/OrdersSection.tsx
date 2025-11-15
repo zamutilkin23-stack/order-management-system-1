@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import Icon from '@/components/ui/icon';
 import { cn } from '@/lib/utils';
 
@@ -81,7 +82,27 @@ export default function OrdersSection({
   });
 
   const handleSubmit = async () => {
-    if (!formData.order_number || !formData.section_id || formData.items.length === 0) {
+    if (!formData.order_number.trim()) {
+      alert('Укажите номер заявки');
+      return;
+    }
+
+    if (!formData.section_id) {
+      alert('Выберите раздел');
+      return;
+    }
+
+    if (formData.items.length === 0) {
+      alert('Добавьте хотя бы один материал');
+      return;
+    }
+
+    const invalidItems = formData.items.filter(item => 
+      !item.material_id || !item.quantity_required || Number(item.quantity_required) <= 0
+    );
+
+    if (invalidItems.length > 0) {
+      alert('Заполните все поля материалов и укажите корректное количество');
       return;
     }
 
@@ -92,7 +113,7 @@ export default function OrdersSection({
       auto_deduct: formData.auto_deduct,
       items: formData.items.map(item => ({
         material_id: Number(item.material_id),
-        color_id: Number(item.color_id) || null,
+        color_id: item.color_id ? Number(item.color_id) : null,
         quantity_required: Number(item.quantity_required)
       }))
     });
@@ -275,12 +296,10 @@ export default function OrdersSection({
                     </div>
 
                     <div className="flex items-center space-x-2 border rounded-lg p-3 bg-muted/30">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         id="auto_deduct"
                         checked={formData.auto_deduct}
-                        onChange={(e) => setFormData({ ...formData, auto_deduct: e.target.checked })}
-                        className="h-4 w-4 rounded border-gray-300"
+                        onCheckedChange={(checked) => setFormData({ ...formData, auto_deduct: checked as boolean })}
                       />
                       <Label htmlFor="auto_deduct" className="text-sm font-normal cursor-pointer">
                         Списать материалы автоматически при отгрузке
