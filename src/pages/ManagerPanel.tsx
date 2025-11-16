@@ -3,8 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
-import OrdersSection from '@/components/manager/OrdersSection';
-import OrderStatusManager from '@/components/manager/OrderStatusManager';
+
 import MaterialsInventory from '@/components/manager/MaterialsInventory';
 import MaterialsManagement from '@/components/worker/MaterialsManagement';
 import ShippedOrders from '@/components/manager/ShippedOrders';
@@ -232,15 +231,7 @@ export default function ManagerPanel({ user, onLogout }: ManagerPanelProps) {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="orders" className="space-y-6">
-          <TabsList className="grid w-full max-w-6xl grid-cols-8">
-            <TabsTrigger value="orders">
-              <Icon name="ClipboardList" size={16} className="mr-2" />
-              Заявки
-            </TabsTrigger>
-            <TabsTrigger value="progress">
-              <Icon name="TrendingUp" size={16} className="mr-2" />
-              Выполнение
-            </TabsTrigger>
+          <TabsList className="grid w-full max-w-6xl grid-cols-6">
             <TabsTrigger value="shipped">
               <Icon name="PackageCheck" size={16} className="mr-2" />
               Отправлено
@@ -266,26 +257,6 @@ export default function ManagerPanel({ user, onLogout }: ManagerPanelProps) {
               Табель
             </TabsTrigger>
           </TabsList>
-
-          <OrdersSection
-            orders={orders}
-            materials={materials}
-            sections={sections}
-            colors={colors}
-            loading={loading}
-            onCreateOrder={createOrder}
-            onDeleteOrder={deleteOrder}
-            onRefresh={loadOrders}
-          />
-
-          <OrderStatusManager
-            orders={orders}
-            materials={materials}
-            sections={sections}
-            colors={colors}
-            onUpdateItem={updateOrderItem}
-            onRefresh={loadOrders}
-          />
 
           <ShippedOrders
             orders={orders}
