@@ -11,6 +11,12 @@ interface Section {
   name: string;
 }
 
+interface Material {
+  id: number;
+  name: string;
+  section_id: number;
+}
+
 interface FormData {
   request_number: string;
   section_id: string;
@@ -30,6 +36,7 @@ interface CreateRequestDialogProps {
   formData: FormData;
   setFormData: (data: FormData) => void;
   sections: Section[];
+  materials: Material[];
   onSubmit: () => void;
 }
 
@@ -39,6 +46,7 @@ export default function CreateRequestDialog({
   formData,
   setFormData,
   sections,
+  materials,
   onSubmit
 }: CreateRequestDialogProps) {
   const addItem = () => {
@@ -123,11 +131,21 @@ export default function CreateRequestDialog({
                 <div key={index} className="grid grid-cols-12 gap-2 p-3 border rounded-lg">
                   <div className="col-span-3">
                     <Label className="text-xs">Название</Label>
-                    <Input
+                    <Select
                       value={item.material_name}
-                      onChange={(e) => updateItem(index, 'material_name', e.target.value)}
-                      placeholder="Материал"
-                    />
+                      onValueChange={(value) => updateItem(index, 'material_name', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {materials
+                          .filter(m => !formData.section_id || String(m.section_id) === formData.section_id)
+                          .map(m => (
+                            <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="col-span-2">
                     <Label className="text-xs">Количество</Label>

@@ -217,6 +217,9 @@ export default function RequestsWork() {
   };
 
   const filteredRequests = requests.filter(r => {
+    // Исключаем отправленные заявки
+    if (r.status === 'sent') return false;
+    
     // Фильтр по статусу
     if (statusFilter !== 'all' && r.status !== statusFilter) return false;
     

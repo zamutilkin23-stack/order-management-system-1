@@ -46,6 +46,7 @@ interface RequestsManagementProps {
 export default function RequestsManagement({ userId }: RequestsManagementProps) {
   const [requests, setRequests] = useState<Request[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
+  const [materials, setMaterials] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sectionFilter, setSectionFilter] = useState<string>('all');
@@ -61,6 +62,7 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
   useEffect(() => {
     loadRequests();
     loadSections();
+    loadMaterials();
   }, []);
 
   const loadRequests = async () => {
@@ -80,6 +82,16 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
       setSections(data);
     } catch (error) {
       toast.error('Ошибка загрузки разделов');
+    }
+  };
+
+  const loadMaterials = async () => {
+    try {
+      const response = await fetch(`${MATERIALS_API}?type=material`);
+      const data = await response.json();
+      setMaterials(data);
+    } catch (error) {
+      toast.error('Ошибка загрузки материалов');
     }
   };
 
@@ -329,6 +341,8 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
   };
 
   const filteredRequests = requests.filter(r => {
+    if (r.status === 'sent') return false;
+    
     if (statusFilter !== 'all' && r.status !== statusFilter) return false;
     
     if (sectionFilter !== 'all' && String(r.section_id) !== sectionFilter) return false;
@@ -382,6 +396,7 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
                 formData={formData}
                 setFormData={setFormData}
                 sections={sections}
+                materials={materials}
                 onSubmit={handleSubmit}
               />
             </div>
