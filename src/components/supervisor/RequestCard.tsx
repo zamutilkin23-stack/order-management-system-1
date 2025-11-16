@@ -21,7 +21,7 @@ interface Request {
   request_number: string;
   section_id: number;
   section_name: string;
-  status: 'new' | 'in_progress' | 'completed';
+  status: 'new' | 'in_progress' | 'completed' | 'sent';
   comment: string;
   created_by: number;
   created_by_name: string;
@@ -34,6 +34,7 @@ interface RequestCardProps {
   onPrint: (request: Request) => void;
   onExport: (request: Request) => void;
   onDelete: (id: number) => void;
+  onSend?: (id: number) => void;
   onUpdateQuantity: (itemId: number, quantity: number) => void;
 }
 
@@ -42,6 +43,7 @@ export default function RequestCard({
   onPrint,
   onExport,
   onDelete,
+  onSend,
   onUpdateQuantity
 }: RequestCardProps) {
   const getStatusBadge = (status: string) => {
@@ -52,6 +54,8 @@ export default function RequestCard({
         return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Выполняется</Badge>;
       case 'completed':
         return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Готово</Badge>;
+      case 'sent':
+        return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Отправлено</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -61,7 +65,8 @@ export default function RequestCard({
     <Card className={cn('border-l-4', 
       request.status === 'new' && 'border-l-blue-500',
       request.status === 'in_progress' && 'border-l-yellow-500',
-      request.status === 'completed' && 'border-l-green-500'
+      request.status === 'completed' && 'border-l-green-500',
+      request.status === 'sent' && 'border-l-purple-500'
     )}>
       <CardHeader>
         <div className="flex items-start justify-between">
@@ -78,6 +83,16 @@ export default function RequestCard({
             )}
           </div>
           <div className="flex gap-2">
+            {onSend && request.status !== 'sent' && (
+              <Button
+                size="sm"
+                variant="default"
+                onClick={() => onSend(request.id)}
+              >
+                <Icon name="Send" size={14} className="mr-1" />
+                Отправить
+              </Button>
+            )}
             <Button
               size="sm"
               variant="outline"

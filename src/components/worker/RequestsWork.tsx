@@ -18,7 +18,7 @@ interface Request {
   request_number: string;
   section_id: number;
   section_name: string;
-  status: 'new' | 'in_progress' | 'completed';
+  status: 'new' | 'in_progress' | 'completed' | 'sent';
   comment: string;
   created_by: number;
   created_by_name: string;
@@ -209,6 +209,8 @@ export default function RequestsWork() {
         return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Выполняется</Badge>;
       case 'completed':
         return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Готово</Badge>;
+      case 'sent':
+        return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Отправлено</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -336,6 +338,13 @@ export default function RequestsWork() {
               >
                 Готово
               </Button>
+              <Button
+                variant={statusFilter === 'sent' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('sent')}
+              >
+                Отправлено
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -350,7 +359,8 @@ export default function RequestsWork() {
                 <Card key={request.id} className={cn('border-l-4', 
                   request.status === 'new' && 'border-l-blue-500',
                   request.status === 'in_progress' && 'border-l-yellow-500',
-                  request.status === 'completed' && 'border-l-green-500'
+                  request.status === 'completed' && 'border-l-green-500',
+                  request.status === 'sent' && 'border-l-purple-500'
                 )}>
                   <CardHeader>
                     <div className="flex items-start justify-between">

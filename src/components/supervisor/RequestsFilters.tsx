@@ -130,6 +130,13 @@ export default function RequestsFilters({
         >
           Готово
         </Button>
+        <Button
+          variant={statusFilter === 'sent' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setStatusFilter('sent')}
+        >
+          Отправлено
+        </Button>
       </div>
     </div>
   );

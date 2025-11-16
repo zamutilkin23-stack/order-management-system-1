@@ -19,7 +19,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, X-User-Id',
                 'Access-Control-Max-Age': '86400'
             },
@@ -488,6 +488,50 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
                 'body': json.dumps(result, default=str),
+                'isBase64Encoded': False
+            }
+        
+        elif method == 'PATCH':
+            params = event.get('queryStringParameters') or {}
+            request_type = params.get('type')
+            request_id = params.get('id')
+            action = params.get('action')
+            
+            if request_type == 'requests' and action == 'send' and request_id:
+                body_data = json.loads(event.get('body', '{}'))
+                new_status = body_data.get('status', 'sent')
+                
+                cur.execute('''
+                    UPDATE requests
+                    SET status = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                    RETURNING id
+                ''', (new_status, request_id))
+                
+                result = cur.fetchone()
+                if not result:
+                    return {
+                        'statusCode': 404,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False),
+                        'isBase64Encoded': False
+                    }
+                
+                conn.commit()
+                cur.close()
+                conn.close()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'message': 'Статус обновлен'}, ensure_ascii=False),
+                    'isBase64Encoded': False
+                }
+            
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': 'Неверные параметры'}, ensure_ascii=False),
                 'isBase64Encoded': False
             }
         

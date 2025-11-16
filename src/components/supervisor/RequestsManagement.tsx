@@ -15,7 +15,7 @@ interface Request {
   request_number: string;
   section_id: number;
   section_name: string;
-  status: 'new' | 'in_progress' | 'completed';
+  status: 'new' | 'in_progress' | 'completed' | 'sent';
   comment: string;
   created_by: number;
   created_by_name: string;
@@ -146,6 +146,27 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
         loadRequests();
       } else {
         toast.error('Ошибка удаления');
+      }
+    } catch (error) {
+      toast.error('Ошибка сервера');
+    }
+  };
+
+  const handleSendRequest = async (id: number) => {
+    if (!confirm('Отправить заявку?')) return;
+
+    try {
+      const response = await fetch(`${REQUESTS_API}?type=requests&id=${id}&action=send`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'sent' })
+      });
+
+      if (response.ok) {
+        toast.success('Заявка отправлена');
+        loadRequests();
+      } else {
+        toast.error('Ошибка отправки');
       }
     } catch (error) {
       toast.error('Ошибка сервера');
@@ -380,6 +401,7 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
                   onPrint={printRequest}
                   onExport={exportToExcel}
                   onDelete={handleDelete}
+                  onSend={handleSendRequest}
                   onUpdateQuantity={updateItemQuantity}
                 />
               ))
