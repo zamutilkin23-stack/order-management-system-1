@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import * as XLSX from 'xlsx';
 
 const REQUESTS_API = 'https://functions.poehali.dev/0ffd935b-d2ee-48e1-a9e4-2b8fe0ffb3dd';
 
@@ -50,6 +51,108 @@ export default function RequestsWork() {
     } catch (error) {
       toast.error('Ошибка загрузки заявок');
     }
+  };
+
+  const printRequest = (request: Request) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const statusText = request.status === 'new' ? 'Новая' : request.status === 'in_progress' ? 'Выполняется' : 'Готово';
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Заявка ${request.request_number}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .info { margin-bottom: 20px; }
+          .info-row { display: flex; margin-bottom: 10px; }
+          .info-label { font-weight: bold; width: 150px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+          th { background-color: #f0f0f0; font-weight: bold; }
+          @media print {
+            button { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>ЗАЯВКА № ${request.request_number}</h1>
+        </div>
+        <div class="info">
+          <div class="info-row"><div class="info-label">Статус:</div><div>${statusText}</div></div>
+          <div class="info-row"><div class="info-label">Раздел:</div><div>${request.section_name}</div></div>
+          <div class="info-row"><div class="info-label">Создал:</div><div>${request.created_by_name}</div></div>
+          <div class="info-row"><div class="info-label">Дата:</div><div>${new Date(request.created_at).toLocaleDateString('ru-RU')}</div></div>
+          ${request.comment ? `<div class="info-row"><div class="info-label">Комментарий:</div><div>${request.comment}</div></div>` : ''}
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>№</th>
+              <th>Материал</th>
+              <th>Требуется</th>
+              <th>Выполнено</th>
+              <th>Цвет</th>
+              <th>Размер</th>
+              <th>Примечание</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${request.items.map((item, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${item.material_name}</td>
+                <td>${item.quantity_required ?? '—'}</td>
+                <td>${item.quantity_completed}</td>
+                <td>${item.color || '—'}</td>
+                <td>${item.size || '—'}</td>
+                <td>${item.comment || '—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <button onclick="window.print()" style="margin-top: 20px; padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer;">Печать</button>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  const exportToExcel = (request: Request) => {
+    const statusText = request.status === 'new' ? 'Новая' : request.status === 'in_progress' ? 'Выполняется' : 'Готово';
+
+    const worksheetData = [
+      ['ЗАЯВКА №', request.request_number],
+      ['Статус', statusText],
+      ['Раздел', request.section_name],
+      ['Создал', request.created_by_name],
+      ['Дата', new Date(request.created_at).toLocaleDateString('ru-RU')],
+      ['Комментарий', request.comment || ''],
+      [],
+      ['№', 'Материал', 'Требуется', 'Выполнено', 'Цвет', 'Размер', 'Примечание'],
+      ...request.items.map((item, index) => [
+        index + 1,
+        item.material_name,
+        item.quantity_required ?? '',
+        item.quantity_completed,
+        item.color || '',
+        item.size || '',
+        item.comment || ''
+      ])
+    ];
+
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Заявка');
+    XLSX.writeFile(workbook, `Заявка_${request.request_number}.xlsx`);
+    toast.success('Экспорт в Excel выполнен');
   };
 
   const updateItemQuantity = async (itemId: number, quantityCompleted: number) => {
@@ -158,6 +261,22 @@ export default function RequestsWork() {
                         {request.comment && (
                           <p className="text-sm text-gray-600 mt-2">{request.comment}</p>
                         )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => printRequest(request)}
+                        >
+                          <Icon name="Printer" size={14} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => exportToExcel(request)}
+                        >
+                          <Icon name="Download" size={14} />
+                        </Button>
                       </div>
                     </div>
                   </CardHeader>
