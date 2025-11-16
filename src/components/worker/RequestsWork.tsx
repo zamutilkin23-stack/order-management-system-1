@@ -182,25 +182,6 @@ export default function RequestsWork() {
     }
   };
 
-  const deleteRequest = async (id: number) => {
-    if (!confirm('Удалить заявку?')) return;
-
-    try {
-      const response = await fetch(`${REQUESTS_API}?type=requests&id=${id}`, {
-        method: 'DELETE'
-      });
-
-      if (response.ok) {
-        toast.success('Заявка удалена');
-        loadRequests();
-      } else {
-        toast.error('Ошибка удаления');
-      }
-    } catch (error) {
-      toast.error('Ошибка сервера');
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'new':
@@ -380,13 +361,6 @@ export default function RequestsWork() {
                           onClick={() => exportToExcel(request)}
                         >
                           <Icon name="Download" size={14} />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => deleteRequest(request.id)}
-                        >
-                          <Icon name="Trash2" size={14} />
                         </Button>
                       </div>
                     </div>

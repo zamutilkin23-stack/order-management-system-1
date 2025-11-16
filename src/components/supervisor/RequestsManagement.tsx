@@ -133,25 +133,6 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Удалить заявку?')) return;
-
-    try {
-      const response = await fetch(`${REQUESTS_API}?type=requests&id=${id}`, {
-        method: 'DELETE'
-      });
-
-      if (response.ok) {
-        toast.success('Заявка удалена');
-        loadRequests();
-      } else {
-        toast.error('Ошибка удаления');
-      }
-    } catch (error) {
-      toast.error('Ошибка сервера');
-    }
-  };
-
   const updateItemQuantity = async (itemId: number, quantityCompleted: number) => {
     try {
       const response = await fetch(REQUESTS_API + '?type=requests', {
@@ -379,7 +360,6 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
                   request={request}
                   onPrint={printRequest}
                   onExport={exportToExcel}
-                  onDelete={handleDelete}
                   onUpdateQuantity={updateItemQuantity}
                 />
               ))
