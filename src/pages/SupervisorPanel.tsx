@@ -12,6 +12,7 @@ import ShippedOrders from '@/components/manager/ShippedOrders';
 import DefectiveReport from '@/components/admin/DefectiveReport';
 import MaterialsArrival from '@/components/manager/MaterialsArrival';
 import EmployeeManagement from '@/components/supervisor/EmployeeManagement';
+import RequestsManagement from '@/components/supervisor/RequestsManagement';
 
 interface User {
   id: number;
@@ -200,7 +201,11 @@ export default function SupervisorPanel({ user, onLogout }: SupervisorPanelProps
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="orders" className="space-y-6">
-          <TabsList className="grid w-full max-w-6xl grid-cols-9">
+          <TabsList className="grid w-full max-w-6xl grid-cols-10">
+            <TabsTrigger value="requests">
+              <Icon name="ClipboardList" size={16} className="mr-2" />
+              Заявки
+            </TabsTrigger>
             <TabsTrigger value="shipped">
               <Icon name="PackageCheck" size={16} className="mr-2" />
               Отправлено
@@ -238,6 +243,8 @@ export default function SupervisorPanel({ user, onLogout }: SupervisorPanelProps
               Материалы
             </TabsTrigger>
           </TabsList>
+
+          <RequestsManagement userId={user.id} />
 
           <ShippedOrders
             orders={orders}

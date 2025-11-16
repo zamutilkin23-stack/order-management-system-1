@@ -33,10 +33,48 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         if method == 'GET':
             params = event.get('queryStringParameters') or {}
+            request_type = params.get('type')
             order_id = params.get('id')
             status_filter = params.get('status')
             get_shipped = params.get('get_shipped')
             get_free_shipments = params.get('get_free_shipments')
+            
+            # Handle requests (new заявки system)
+            if request_type == 'requests':
+                cur.execute('''
+                    SELECT 
+                        r.id, r.request_number, r.section_id, r.status, r.comment,
+                        r.created_by, r.created_at, r.updated_at,
+                        s.name as section_name,
+                        u.full_name as created_by_name
+                    FROM requests r
+                    LEFT JOIN sections s ON r.section_id = s.id
+                    LEFT JOIN users u ON r.created_by = u.id
+                    ORDER BY r.created_at DESC
+                ''')
+                requests = cur.fetchall()
+                
+                for req in requests:
+                    cur.execute('''
+                        SELECT id, request_id, material_name, quantity_required, 
+                               quantity_completed, color, size, comment
+                        FROM request_items
+                        WHERE request_id = %s
+                        ORDER BY id
+                    ''', (req['id'],))
+                    req['items'] = cur.fetchall()
+                
+                result = [dict(r) for r in requests]
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    'body': json.dumps(result, default=str, ensure_ascii=False),
+                    'isBase64Encoded': False
+                }
             
             if get_free_shipments:
                 cur.execute("""
@@ -113,8 +151,59 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         elif method == 'POST':
             body_data = json.loads(event.get('body', '{}'))
+            params = event.get('queryStringParameters') or {}
+            request_type = params.get('type')
             
-            if body_data.get('free_shipment'):
+            # Handle request creation
+            if request_type == 'requests':
+                request_number = body_data.get('request_number')
+                section_id = body_data.get('section_id')
+                comment = body_data.get('comment', '')
+                created_by = body_data.get('created_by')
+                items = body_data.get('items', [])
+                
+                if not request_number or not section_id or not created_by:
+                    return {
+                        'statusCode': 400,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'error': 'Не указаны обязательные поля'}, ensure_ascii=False),
+                        'isBase64Encoded': False
+                    }
+                
+                cur.execute('''
+                    INSERT INTO requests (request_number, section_id, comment, created_by, status)
+                    VALUES (%s, %s, %s, %s, 'new')
+                    RETURNING id
+                ''', (request_number, section_id, comment, created_by))
+                
+                request_id = cur.fetchone()['id']
+                
+                for item in items:
+                    cur.execute('''
+                        INSERT INTO request_items 
+                        (request_id, material_name, quantity_required, color, size, comment)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    ''', (
+                        request_id,
+                        item.get('material_name'),
+                        item.get('quantity_required'),
+                        item.get('color'),
+                        item.get('size'),
+                        item.get('comment', '')
+                    ))
+                
+                conn.commit()
+                cur.close()
+                conn.close()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'id': request_id, 'message': 'Заявка создана'}, ensure_ascii=False),
+                    'isBase64Encoded': False
+                }
+            
+            elif body_data.get('free_shipment'):
                 shipped_items = body_data.get('items', [])
                 shipped_by = body_data.get('shipped_by')
                 comment = body_data.get('comment', '')
@@ -214,6 +303,75 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         elif method == 'PUT':
             body_data = json.loads(event.get('body', '{}'))
+            params = event.get('queryStringParameters') or {}
+            request_type = params.get('type')
+            
+            # Handle request item update
+            if request_type == 'requests':
+                item_id = body_data.get('item_id')
+                quantity_completed = body_data.get('quantity_completed')
+                
+                if item_id is None or quantity_completed is None:
+                    return {
+                        'statusCode': 400,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'error': 'Не указаны item_id или quantity_completed'}, ensure_ascii=False),
+                        'isBase64Encoded': False
+                    }
+                
+                cur.execute('''
+                    UPDATE request_items
+                    SET quantity_completed = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                    RETURNING request_id
+                ''', (quantity_completed, item_id))
+                
+                result = cur.fetchone()
+                if not result:
+                    return {
+                        'statusCode': 404,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'error': 'Позиция не найдена'}, ensure_ascii=False),
+                        'isBase64Encoded': False
+                    }
+                
+                request_id = result['request_id']
+                
+                # Update request status automatically
+                cur.execute('''
+                    SELECT COUNT(*) as total,
+                           SUM(CASE WHEN quantity_required IS NULL OR quantity_completed >= quantity_required THEN 1 ELSE 0 END) as completed,
+                           SUM(CASE WHEN quantity_completed > 0 THEN 1 ELSE 0 END) as has_progress
+                    FROM request_items
+                    WHERE request_id = %s
+                ''', (request_id,))
+                
+                stats = cur.fetchone()
+                
+                if stats['completed'] == stats['total'] and stats['total'] > 0:
+                    new_status = 'completed'
+                elif stats['has_progress'] > 0:
+                    new_status = 'in_progress'
+                else:
+                    new_status = 'new'
+                
+                cur.execute('''
+                    UPDATE requests
+                    SET status = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                ''', (new_status, request_id))
+                
+                conn.commit()
+                cur.close()
+                conn.close()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'message': 'Количество обновлено', 'new_status': new_status}, ensure_ascii=False),
+                    'isBase64Encoded': False
+                }
+            
             order_id = body_data.get('id')
             item_id = body_data.get('item_id')
             
@@ -335,9 +493,26 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         elif method == 'DELETE':
             params = event.get('queryStringParameters') or {}
+            request_type = params.get('type')
             order_id = params.get('id')
             shipment_id = params.get('shipment_id')
-            shipment_type = params.get('type')
+            
+            # Handle request deletion
+            if request_type == 'requests' and order_id:
+                cur.execute('DELETE FROM request_items WHERE request_id = %s', (order_id,))
+                cur.execute('DELETE FROM requests WHERE id = %s', (order_id,))
+                conn.commit()
+                cur.close()
+                conn.close()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'message': 'Заявка удалена'}, ensure_ascii=False),
+                    'isBase64Encoded': False
+                }
+            
+            shipment_type = params.get('shipment_type')
             
             if shipment_id and shipment_type:
                 if shipment_type == 'free':

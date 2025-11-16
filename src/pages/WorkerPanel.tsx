@@ -9,6 +9,7 @@ import SectionsManagement from '@/components/admin/SectionsManagement';
 import MaterialsManagement from '@/components/worker/MaterialsManagement';
 import ShippedOrders from '@/components/manager/ShippedOrders';
 import MaterialsArrival from '@/components/manager/MaterialsArrival';
+import RequestsWork from '@/components/worker/RequestsWork';
 
 const ORDERS_API = 'https://functions.poehali.dev/0ffd935b-d2ee-48e1-a9e4-2b8fe0ffb3dd';
 const MATERIALS_API = 'https://functions.poehali.dev/74905bf8-26b1-4b87-9a75-660316d4ba77';
@@ -207,7 +208,11 @@ export default function WorkerPanel({ user, onLogout }: WorkerPanelProps) {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="orders" className="space-y-6">
-          <TabsList className="grid w-full max-w-5xl grid-cols-5">
+          <TabsList className="grid w-full max-w-5xl grid-cols-6">
+            <TabsTrigger value="requests">
+              <Icon name="ClipboardList" size={16} className="mr-2" />
+              Заявки
+            </TabsTrigger>
             <TabsTrigger value="shipped">
               <Icon name="PackageCheck" size={16} className="mr-2" />
               Отправлено
@@ -229,6 +234,8 @@ export default function WorkerPanel({ user, onLogout }: WorkerPanelProps) {
               Табель
             </TabsTrigger>
           </TabsList>
+
+          <RequestsWork />
 
           <ShippedOrders
             orders={orders}
