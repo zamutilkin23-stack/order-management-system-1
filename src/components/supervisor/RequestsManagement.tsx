@@ -1,18 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TabsContent } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
+import RequestsFilters from './RequestsFilters';
+import CreateRequestDialog from './CreateRequestDialog';
+import RequestCard from './RequestCard';
 
 const REQUESTS_API = 'https://functions.poehali.dev/0ffd935b-d2ee-48e1-a9e4-2b8fe0ffb3dd';
 const MATERIALS_API = 'https://functions.poehali.dev/74905bf8-26b1-4b87-9a75-660316d4ba77';
@@ -181,26 +174,6 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
     }
   };
 
-  const addItem = () => {
-    setFormData({
-      ...formData,
-      items: [...formData.items, { material_name: '', quantity_required: '', color: '', size: '', comment: '' }]
-    });
-  };
-
-  const removeItem = (index: number) => {
-    setFormData({
-      ...formData,
-      items: formData.items.filter((_, i) => i !== index)
-    });
-  };
-
-  const updateItem = (index: number, field: string, value: string) => {
-    const newItems = [...formData.items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    setFormData({ ...formData, items: newItems });
-  };
-
   const printRequest = (request: Request) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -334,38 +307,21 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
     toast.success('Экспорт всех заявок выполнен');
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'new':
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Новая</Badge>;
-      case 'in_progress':
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Выполняется</Badge>;
-      case 'completed':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Готово</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
   const filteredRequests = requests.filter(r => {
-    // Фильтр по статусу
     if (statusFilter !== 'all' && r.status !== statusFilter) return false;
     
-    // Фильтр по разделу
     if (sectionFilter !== 'all' && String(r.section_id) !== sectionFilter) return false;
     
-    // Фильтр по дате от
     if (dateFrom) {
       const requestDate = new Date(r.created_at);
       const fromDate = new Date(dateFrom);
       if (requestDate < fromDate) return false;
     }
     
-    // Фильтр по дате до
     if (dateTo) {
       const requestDate = new Date(r.created_at);
       const toDate = new Date(dateTo);
-      toDate.setHours(23, 59, 59, 999); // Конец дня
+      toDate.setHours(23, 59, 59, 999);
       if (requestDate > toDate) return false;
     }
     
@@ -382,220 +338,31 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
                 <CardTitle>Заявки</CardTitle>
                 <CardDescription>Управление производственными заявками</CardDescription>
               </div>
-              <Button
-                variant="outline"
-                onClick={exportAllToExcel}
-                disabled={filteredRequests.length === 0}
-              >
-                <Icon name="Download" size={16} className="mr-2" />
-                Экспорт в Excel
-              </Button>
             </div>
             
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex gap-2 items-center">
-                <Label className="text-sm font-medium">Раздел:</Label>
-                <Select value={sectionFilter} onValueChange={setSectionFilter}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Все разделы</SelectItem>
-                    {sections.map(s => (
-                      <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <RequestsFilters
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
+              sectionFilter={sectionFilter}
+              setSectionFilter={setSectionFilter}
+              dateFrom={dateFrom}
+              setDateFrom={setDateFrom}
+              dateTo={dateTo}
+              setDateTo={setDateTo}
+              sections={sections}
+              onExportAll={exportAllToExcel}
+              exportDisabled={filteredRequests.length === 0}
+            />
 
-              <div className="flex gap-2 items-center">
-                <Label className="text-sm font-medium">Дата от:</Label>
-                <Input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-40"
-                />
-              </div>
-
-              <div className="flex gap-2 items-center">
-                <Label className="text-sm font-medium">до:</Label>
-                <Input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="w-40"
-                />
-              </div>
-
-              {(sectionFilter !== 'all' || dateFrom || dateTo) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSectionFilter('all');
-                    setDateFrom('');
-                    setDateTo('');
-                  }}
-                >
-                  <Icon name="X" size={14} className="mr-1" />
-                  Сбросить
-                </Button>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 justify-between">
-              <div className="flex gap-2">
-                <Button
-                  variant={statusFilter === 'all' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter('all')}
-                >
-                  Все
-                </Button>
-                <Button
-                  variant={statusFilter === 'new' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter('new')}
-                >
-                  Новые
-                </Button>
-                <Button
-                  variant={statusFilter === 'in_progress' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter('in_progress')}
-                >
-                  В работе
-                </Button>
-                <Button
-                  variant={statusFilter === 'completed' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter('completed')}
-                >
-                  Готово
-                </Button>
-              </div>
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Icon name="Plus" size={16} className="mr-2" />
-                    Создать заявку
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Новая заявка</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Номер заявки</Label>
-                        <Input
-                          value={formData.request_number}
-                          onChange={(e) => setFormData({ ...formData, request_number: e.target.value })}
-                          placeholder="Например: ЗАВ-001"
-                        />
-                      </div>
-                      <div>
-                        <Label>Раздел</Label>
-                        <Select
-                          value={formData.section_id}
-                          onValueChange={(value) => setFormData({ ...formData, section_id: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Выберите раздел" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {sections.map(s => (
-                              <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label>Комментарий</Label>
-                      <Textarea
-                        value={formData.comment}
-                        onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
-                        placeholder="Дополнительная информация"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <Label>Материалы</Label>
-                        <Button size="sm" variant="outline" onClick={addItem}>
-                          <Icon name="Plus" size={14} className="mr-1" />
-                          Добавить
-                        </Button>
-                      </div>
-                      <div className="space-y-2">
-                        {formData.items.map((item, index) => (
-                          <div key={index} className="grid grid-cols-12 gap-2 p-3 border rounded-lg">
-                            <div className="col-span-3">
-                              <Label className="text-xs">Название</Label>
-                              <Input
-                                value={item.material_name}
-                                onChange={(e) => updateItem(index, 'material_name', e.target.value)}
-                                placeholder="Материал"
-                              />
-                            </div>
-                            <div className="col-span-2">
-                              <Label className="text-xs">Количество</Label>
-                              <Input
-                                type="number"
-                                value={item.quantity_required}
-                                onChange={(e) => updateItem(index, 'quantity_required', e.target.value)}
-                                placeholder="необязательно"
-                              />
-                            </div>
-                            <div className="col-span-2">
-                              <Label className="text-xs">Цвет</Label>
-                              <Input
-                                value={item.color}
-                                onChange={(e) => updateItem(index, 'color', e.target.value)}
-                                placeholder="необязательно"
-                              />
-                            </div>
-                            <div className="col-span-2">
-                              <Label className="text-xs">Размер</Label>
-                              <Input
-                                value={item.size}
-                                onChange={(e) => updateItem(index, 'size', e.target.value)}
-                                placeholder="необязательно"
-                              />
-                            </div>
-                            <div className="col-span-2">
-                              <Label className="text-xs">Примечание</Label>
-                              <Input
-                                value={item.comment}
-                                onChange={(e) => updateItem(index, 'comment', e.target.value)}
-                                placeholder="необязательно"
-                              />
-                            </div>
-                            <div className="col-span-1 flex items-end">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => removeItem(index)}
-                                disabled={formData.items.length === 1}
-                              >
-                                <Icon name="X" size={14} />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <Button onClick={handleSubmit} className="w-full">
-                      Создать заявку
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+            <div className="flex items-center justify-end">
+              <CreateRequestDialog
+                dialogOpen={dialogOpen}
+                setDialogOpen={setDialogOpen}
+                formData={formData}
+                setFormData={setFormData}
+                sections={sections}
+                onSubmit={handleSubmit}
+              />
             </div>
           </div>
         </CardHeader>
@@ -607,100 +374,14 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
               </div>
             ) : (
               filteredRequests.map((request) => (
-                <Card key={request.id} className={cn('border-l-4', 
-                  request.status === 'new' && 'border-l-blue-500',
-                  request.status === 'in_progress' && 'border-l-yellow-500',
-                  request.status === 'completed' && 'border-l-green-500'
-                )}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <CardTitle className="text-lg">{request.request_number}</CardTitle>
-                          {getStatusBadge(request.status)}
-                        </div>
-                        <CardDescription className="mt-1">
-                          {request.section_name} • {request.created_by_name} • {new Date(request.created_at).toLocaleDateString('ru-RU')}
-                        </CardDescription>
-                        {request.comment && (
-                          <p className="text-sm text-gray-600 mt-2">{request.comment}</p>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => printRequest(request)}
-                        >
-                          <Icon name="Printer" size={14} />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => exportToExcel(request)}
-                        >
-                          <Icon name="Download" size={14} />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDelete(request.id)}
-                        >
-                          <Icon name="Trash2" size={14} />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Материал</TableHead>
-                          <TableHead>Требуется</TableHead>
-                          <TableHead>Выполнено</TableHead>
-                          <TableHead>Цвет</TableHead>
-                          <TableHead>Размер</TableHead>
-                          <TableHead>Примечание</TableHead>
-                          <TableHead>Действия</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {request.items.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell className="font-medium">{item.material_name}</TableCell>
-                            <TableCell>{item.quantity_required ?? '—'}</TableCell>
-                            <TableCell className="font-mono">
-                              <span className={cn(
-                                item.quantity_required && item.quantity_completed >= item.quantity_required && 'text-green-600 font-bold'
-                              )}>
-                                {item.quantity_completed}
-                              </span>
-                            </TableCell>
-                            <TableCell>{item.color || '—'}</TableCell>
-                            <TableCell>{item.size || '—'}</TableCell>
-                            <TableCell className="text-sm text-gray-600">{item.comment || '—'}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    const newQty = prompt('Введите выполненное количество:', String(item.quantity_completed));
-                                    if (newQty !== null) {
-                                      updateItemQuantity(item.id, Number(newQty));
-                                    }
-                                  }}
-                                >
-                                  <Icon name="Edit" size={14} />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
+                <RequestCard
+                  key={request.id}
+                  request={request}
+                  onPrint={printRequest}
+                  onExport={exportToExcel}
+                  onDelete={handleDelete}
+                  onUpdateQuantity={updateItemQuantity}
+                />
               ))
             )}
           </div>
