@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -38,6 +40,9 @@ interface RequestItem {
 export default function RequestsWork() {
   const [requests, setRequests] = useState<Request[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [searchText, setSearchText] = useState<string>('');
 
   useEffect(() => {
     loadRequests();
@@ -190,20 +195,100 @@ export default function RequestsWork() {
     }
   };
 
-  const filteredRequests = statusFilter === 'all' 
-    ? requests 
-    : requests.filter(r => r.status === statusFilter);
+  const filteredRequests = requests.filter(r => {
+    // Фильтр по статусу
+    if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+    
+    // Фильтр по дате от
+    if (dateFrom) {
+      const requestDate = new Date(r.created_at);
+      const fromDate = new Date(dateFrom);
+      if (requestDate < fromDate) return false;
+    }
+    
+    // Фильтр по дате до
+    if (dateTo) {
+      const requestDate = new Date(r.created_at);
+      const toDate = new Date(dateTo);
+      toDate.setHours(23, 59, 59, 999);
+      if (requestDate > toDate) return false;
+    }
+    
+    // Поиск по тексту
+    if (searchText) {
+      const search = searchText.toLowerCase();
+      const matchNumber = r.request_number.toLowerCase().includes(search);
+      const matchSection = r.section_name.toLowerCase().includes(search);
+      const matchComment = r.comment?.toLowerCase().includes(search);
+      const matchMaterial = r.items.some(item => 
+        item.material_name.toLowerCase().includes(search)
+      );
+      if (!matchNumber && !matchSection && !matchComment && !matchMaterial) return false;
+    }
+    
+    return true;
+  });
 
   return (
     <TabsContent value="requests">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Заявки</CardTitle>
-              <CardDescription>Производственные заявки для выполнения</CardDescription>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Заявки</CardTitle>
+                <CardDescription>Производственные заявки для выполнения</CardDescription>
+              </div>
             </div>
-            <div className="flex gap-2">
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex gap-2 items-center flex-1">
+                <Icon name="Search" size={16} className="text-gray-500" />
+                <Input
+                  placeholder="Поиск по номеру, разделу, материалу..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  className="max-w-md"
+                />
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <Label className="text-sm font-medium">Дата от:</Label>
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-40"
+                />
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <Label className="text-sm font-medium">до:</Label>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-40"
+                />
+              </div>
+
+              {(searchText || dateFrom || dateTo) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchText('');
+                    setDateFrom('');
+                    setDateTo('');
+                  }}
+                >
+                  <Icon name="X" size={14} className="mr-1" />
+                  Сбросить
+                </Button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
               <Button
                 variant={statusFilter === 'all' ? 'default' : 'outline'}
                 size="sm"

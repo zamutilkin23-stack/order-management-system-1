@@ -55,6 +55,9 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
   const [sections, setSections] = useState<Section[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sectionFilter, setSectionFilter] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
   const [formData, setFormData] = useState({
     request_number: '',
     section_id: '',
@@ -344,20 +347,104 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
     }
   };
 
-  const filteredRequests = statusFilter === 'all' 
-    ? requests 
-    : requests.filter(r => r.status === statusFilter);
+  const filteredRequests = requests.filter(r => {
+    // Фильтр по статусу
+    if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+    
+    // Фильтр по разделу
+    if (sectionFilter !== 'all' && String(r.section_id) !== sectionFilter) return false;
+    
+    // Фильтр по дате от
+    if (dateFrom) {
+      const requestDate = new Date(r.created_at);
+      const fromDate = new Date(dateFrom);
+      if (requestDate < fromDate) return false;
+    }
+    
+    // Фильтр по дате до
+    if (dateTo) {
+      const requestDate = new Date(r.created_at);
+      const toDate = new Date(dateTo);
+      toDate.setHours(23, 59, 59, 999); // Конец дня
+      if (requestDate > toDate) return false;
+    }
+    
+    return true;
+  });
 
   return (
     <TabsContent value="requests">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Заявки</CardTitle>
-              <CardDescription>Управление производственными заявками</CardDescription>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Заявки</CardTitle>
+                <CardDescription>Управление производственными заявками</CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                onClick={exportAllToExcel}
+                disabled={filteredRequests.length === 0}
+              >
+                <Icon name="Download" size={16} className="mr-2" />
+                Экспорт в Excel
+              </Button>
             </div>
-            <div className="flex items-center gap-2">
+            
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex gap-2 items-center">
+                <Label className="text-sm font-medium">Раздел:</Label>
+                <Select value={sectionFilter} onValueChange={setSectionFilter}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Все разделы</SelectItem>
+                    {sections.map(s => (
+                      <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <Label className="text-sm font-medium">Дата от:</Label>
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-40"
+                />
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <Label className="text-sm font-medium">до:</Label>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-40"
+                />
+              </div>
+
+              {(sectionFilter !== 'all' || dateFrom || dateTo) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSectionFilter('all');
+                    setDateFrom('');
+                    setDateTo('');
+                  }}
+                >
+                  <Icon name="X" size={14} className="mr-1" />
+                  Сбросить
+                </Button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 justify-between">
               <div className="flex gap-2">
                 <Button
                   variant={statusFilter === 'all' ? 'default' : 'outline'}
@@ -388,14 +475,6 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
                   Готово
                 </Button>
               </div>
-              <Button
-                variant="outline"
-                onClick={exportAllToExcel}
-                disabled={filteredRequests.length === 0}
-              >
-                <Icon name="Download" size={16} className="mr-2" />
-                Экспорт в Excel
-              </Button>
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
                   <Button>
