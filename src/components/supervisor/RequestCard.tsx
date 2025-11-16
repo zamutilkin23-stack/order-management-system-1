@@ -33,6 +33,7 @@ interface RequestCardProps {
   request: Request;
   onPrint: (request: Request) => void;
   onExport: (request: Request) => void;
+  onDelete: (id: number) => void;
   onUpdateQuantity: (itemId: number, quantity: number) => void;
 }
 
@@ -40,6 +41,7 @@ export default function RequestCard({
   request,
   onPrint,
   onExport,
+  onDelete,
   onUpdateQuantity
 }: RequestCardProps) {
   const getStatusBadge = (status: string) => {
@@ -89,6 +91,13 @@ export default function RequestCard({
               onClick={() => onExport(request)}
             >
               <Icon name="Download" size={14} />
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => onDelete(request.id)}
+            >
+              <Icon name="Trash2" size={14} />
             </Button>
           </div>
         </div>
