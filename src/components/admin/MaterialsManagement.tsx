@@ -45,7 +45,6 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
     name: '',
     section_id: '',
     quantity: 0,
-    auto_deduct: false,
     manual_deduct: true,
     defect_tracking: false
   });
@@ -99,7 +98,7 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
         toast.success(editingMaterial ? 'Материал обновлен' : 'Материал создан');
         setDialogOpen(false);
         setEditingMaterial(null);
-        setFormData({ name: '', section_id: '', quantity: 0, auto_deduct: false, manual_deduct: true, defect_tracking: false });
+        setFormData({ name: '', section_id: '', quantity: 0, manual_deduct: true, defect_tracking: false });
         loadMaterials();
       }
     } catch (error) {
@@ -156,7 +155,6 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
       name: material.name,
       section_id: String(material.section_id),
       quantity: material.quantity,
-      auto_deduct: material.auto_deduct,
       manual_deduct: material.manual_deduct,
       defect_tracking: material.defect_tracking
     });
@@ -166,7 +164,7 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setEditingMaterial(null);
-    setFormData({ name: '', section_id: '', quantity: 0, auto_deduct: false, manual_deduct: true, defect_tracking: false });
+    setFormData({ name: '', section_id: '', quantity: 0, manual_deduct: true, defect_tracking: false });
   };
 
   const filteredMaterials = getFilteredMaterials();
@@ -178,7 +176,7 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Материалы</CardTitle>
-              <CardDescription>Управление материалами и остатками</CardDescription>
+              <CardDescription>Управление материалами на складе</CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Select value={selectedSectionFilter} onValueChange={setSelectedSectionFilter}>
@@ -241,10 +239,6 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
-                      <Checkbox checked={formData.auto_deduct} onCheckedChange={(checked) => setFormData({ ...formData, auto_deduct: checked as boolean })} />
-                      <Label>Автоматическое списание</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
                       <Checkbox checked={formData.manual_deduct} onCheckedChange={(checked) => setFormData({ ...formData, manual_deduct: checked as boolean })} />
                       <Label>Ручное списание</Label>
                     </div>
@@ -290,7 +284,6 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      {material.auto_deduct && <Badge variant="outline" className="text-xs">Авто</Badge>}
                       {material.manual_deduct && <Badge variant="outline" className="text-xs">Ручное</Badge>}
                       {material.defect_tracking && <Badge variant="outline" className="text-xs">Брак</Badge>}
                     </div>

@@ -199,7 +199,7 @@ export default function ManagerPanel({ user, onLogout }: ManagerPanelProps) {
       });
 
       if (response.ok) {
-        toast.success('Остатки обновлены');
+        toast.success('Склад обновлен');
         loadMaterials();
       } else {
         toast.error('Ошибка обновления');
@@ -246,7 +246,7 @@ export default function ManagerPanel({ user, onLogout }: ManagerPanelProps) {
             </TabsTrigger>
             <TabsTrigger value="inventory">
               <Icon name="Package" size={16} className="mr-2" />
-              Остатки
+              Склад
             </TabsTrigger>
             <TabsTrigger value="materials">
               <Icon name="PackagePlus" size={16} className="mr-2" />

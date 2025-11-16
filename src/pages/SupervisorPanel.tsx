@@ -168,7 +168,7 @@ export default function SupervisorPanel({ user, onLogout }: SupervisorPanelProps
       });
 
       if (response.ok) {
-        toast.success('Остатки обновлены');
+        toast.success('Склад обновлен');
         loadMaterials();
       } else {
         toast.error('Ошибка обновления');
@@ -215,7 +215,7 @@ export default function SupervisorPanel({ user, onLogout }: SupervisorPanelProps
             </TabsTrigger>
             <TabsTrigger value="inventory">
               <Icon name="Package" size={16} className="mr-2" />
-              Остатки
+              Склад
             </TabsTrigger>
             <TabsTrigger value="employees">
               <Icon name="Users" size={16} className="mr-2" />
