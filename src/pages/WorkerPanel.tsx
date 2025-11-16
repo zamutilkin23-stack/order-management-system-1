@@ -3,14 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
-import OrdersSection from '@/components/manager/OrdersSection';
 import SectionsView from '@/components/worker/SectionsView';
 import TimeTracking from '@/components/admin/TimeTracking';
 import SectionsManagement from '@/components/admin/SectionsManagement';
 import MaterialsManagement from '@/components/worker/MaterialsManagement';
 import ShippedOrders from '@/components/manager/ShippedOrders';
 import MaterialsArrival from '@/components/manager/MaterialsArrival';
-import OrderStatusManager from '@/components/manager/OrderStatusManager';
 
 const ORDERS_API = 'https://functions.poehali.dev/0ffd935b-d2ee-48e1-a9e4-2b8fe0ffb3dd';
 const MATERIALS_API = 'https://functions.poehali.dev/74905bf8-26b1-4b87-9a75-660316d4ba77';
@@ -209,15 +207,7 @@ export default function WorkerPanel({ user, onLogout }: WorkerPanelProps) {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="orders" className="space-y-6">
-          <TabsList className="grid w-full max-w-5xl grid-cols-7">
-            <TabsTrigger value="orders">
-              <Icon name="ClipboardList" size={16} className="mr-2" />
-              Заявки
-            </TabsTrigger>
-            <TabsTrigger value="progress">
-              <Icon name="TrendingUp" size={16} className="mr-2" />
-              Выполнение
-            </TabsTrigger>
+          <TabsList className="grid w-full max-w-5xl grid-cols-5">
             <TabsTrigger value="shipped">
               <Icon name="PackageCheck" size={16} className="mr-2" />
               Отправлено
@@ -239,26 +229,6 @@ export default function WorkerPanel({ user, onLogout }: WorkerPanelProps) {
               Табель
             </TabsTrigger>
           </TabsList>
-
-          <OrdersSection
-            orders={orders}
-            materials={materials}
-            sections={sections}
-            colors={colors}
-            loading={false}
-            onCreateOrder={createOrder}
-            onDeleteOrder={deleteOrder}
-            onRefresh={loadOrders}
-          />
-
-          <OrderStatusManager
-            orders={orders}
-            materials={materials}
-            sections={sections}
-            colors={colors}
-            onUpdateItem={updateOrderItem}
-            onRefresh={loadOrders}
-          />
 
           <ShippedOrders
             orders={orders}
