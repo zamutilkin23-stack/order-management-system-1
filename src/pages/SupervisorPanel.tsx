@@ -7,8 +7,6 @@ import TimeTracking from '@/components/admin/TimeTracking';
 import SectionsManagement from '@/components/admin/SectionsManagement';
 import ColorsManagement from '@/components/admin/ColorsManagement';
 import MaterialsManagement from '@/components/admin/MaterialsManagement';
-import OrdersSection from '@/components/manager/OrdersSection';
-import OrderStatusManager from '@/components/manager/OrderStatusManager';
 import MaterialsInventory from '@/components/manager/MaterialsInventory';
 import ShippedOrders from '@/components/manager/ShippedOrders';
 import DefectiveReport from '@/components/admin/DefectiveReport';
@@ -202,15 +200,7 @@ export default function SupervisorPanel({ user, onLogout }: SupervisorPanelProps
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="orders" className="space-y-6">
-          <TabsList className="grid w-full max-w-6xl grid-cols-11">
-            <TabsTrigger value="orders">
-              <Icon name="ClipboardList" size={16} className="mr-2" />
-              Заявки
-            </TabsTrigger>
-            <TabsTrigger value="progress">
-              <Icon name="TrendingUp" size={16} className="mr-2" />
-              Выполнение
-            </TabsTrigger>
+          <TabsList className="grid w-full max-w-6xl grid-cols-9">
             <TabsTrigger value="shipped">
               <Icon name="PackageCheck" size={16} className="mr-2" />
               Отправлено
@@ -248,26 +238,6 @@ export default function SupervisorPanel({ user, onLogout }: SupervisorPanelProps
               Материалы
             </TabsTrigger>
           </TabsList>
-
-          <OrdersSection
-            orders={orders}
-            materials={materials}
-            sections={sections}
-            colors={colors}
-            loading={loading}
-            onCreateOrder={createOrder}
-            onDeleteOrder={deleteOrder}
-            onRefresh={loadOrders}
-          />
-
-          <OrderStatusManager
-            orders={orders}
-            materials={materials}
-            sections={sections}
-            colors={colors}
-            onUpdateItem={updateOrderItem}
-            onRefresh={loadOrders}
-          />
 
           <ShippedOrders
             orders={orders}
