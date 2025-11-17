@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-
-const REQUESTS_API = 'https://functions.poehali.dev/0ffd935b-d2ee-48e1-a9e4-2b8fe0ffb3dd';
-const MATERIALS_API = 'https://functions.poehali.dev/74905bf8-26b1-4b87-9a75-660316d4ba77';
+import { requestsService, materialsService } from '@/lib/api';
 
 export interface Request {
   id: number;
@@ -46,8 +44,7 @@ export function useRequestsData() {
 
   const loadRequests = async () => {
     try {
-      const response = await fetch(REQUESTS_API + '?type=requests');
-      const data = await response.json();
+      const data = await requestsService.getAll();
       setRequests(data || []);
     } catch (error) {
       toast.error('Ошибка загрузки заявок');
@@ -56,8 +53,7 @@ export function useRequestsData() {
 
   const loadSections = async () => {
     try {
-      const response = await fetch(`${MATERIALS_API}?type=section`);
-      const data = await response.json();
+      const data = await materialsService.getSections();
       setSections(data);
     } catch (error) {
       toast.error('Ошибка загрузки разделов');
@@ -66,8 +62,7 @@ export function useRequestsData() {
 
   const loadMaterials = async () => {
     try {
-      const response = await fetch(`${MATERIALS_API}?type=material`);
-      const data = await response.json();
+      const data = await materialsService.getAll();
       setMaterials(data);
     } catch (error) {
       toast.error('Ошибка загрузки материалов');
