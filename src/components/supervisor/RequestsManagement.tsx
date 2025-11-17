@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TabsContent } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import RequestsFilters from './RequestsFilters';
@@ -52,6 +54,7 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
   const [sectionFilter, setSectionFilter] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
+  const [selectedRequests, setSelectedRequests] = useState<number[]>([]);
   const [formData, setFormData] = useState({
     request_number: '',
     section_id: '',
@@ -161,6 +164,62 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
       }
     } catch (error) {
       toast.error('Ошибка сервера');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedRequests.length === 0) return;
+
+    const requestsToDelete = requests.filter(r => selectedRequests.includes(r.id));
+    const requestNumbers = requestsToDelete.map(r => r.request_number).join(', ');
+
+    if (!confirm(`Удалить выбранные заявки (${selectedRequests.length} шт.)?
+
+Номера: ${requestNumbers}
+
+Заявки будут удалены безвозвратно.`)) return;
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const id of selectedRequests) {
+      try {
+        const response = await fetch(`${REQUESTS_API}?type=requests&id=${id}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      } catch (error) {
+        errorCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`Удалено заявок: ${successCount}`);
+    }
+    if (errorCount > 0) {
+      toast.error(`Ошибок при удалении: ${errorCount}`);
+    }
+
+    setSelectedRequests([]);
+    loadRequests();
+  };
+
+  const toggleSelectRequest = (id: number) => {
+    setSelectedRequests(prev => 
+      prev.includes(id) ? prev.filter(reqId => reqId !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedRequests.length === filteredRequests.length) {
+      setSelectedRequests([]);
+    } else {
+      setSelectedRequests(filteredRequests.map(r => r.id));
     }
   };
 
@@ -389,7 +448,31 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
               exportDisabled={filteredRequests.length === 0}
             />
 
-            <div className="flex items-center justify-end">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {filteredRequests.length > 0 && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={toggleSelectAll}
+                    >
+                      <Icon name={selectedRequests.length === filteredRequests.length ? 'CheckSquare' : 'Square'} size={16} className="mr-1" />
+                      {selectedRequests.length === filteredRequests.length ? 'Снять всё' : 'Выбрать всё'}
+                    </Button>
+                    {selectedRequests.length > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleBulkDelete}
+                      >
+                        <Icon name="Trash2" size={16} className="mr-1" />
+                        Удалить ({selectedRequests.length})
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
               <CreateRequestDialog
                 dialogOpen={dialogOpen}
                 setDialogOpen={setDialogOpen}
@@ -418,6 +501,9 @@ export default function RequestsManagement({ userId }: RequestsManagementProps) 
                   onDelete={handleDelete}
                   onSend={handleSendRequest}
                   onUpdateQuantity={updateItemQuantity}
+                  isSelected={selectedRequests.includes(request.id)}
+                  onSelect={toggleSelectRequest}
+                  showCheckbox
                 />
               ))
             )}

@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import Icon from '@/components/ui/icon';
 import { cn } from '@/lib/utils';
 
@@ -38,6 +39,9 @@ interface RequestCardProps {
   onUpdateQuantity?: (itemId: number, quantity: number) => void;
   showOnlySend?: boolean;
   allowEdit?: boolean;
+  isSelected?: boolean;
+  onSelect?: (id: number) => void;
+  showCheckbox?: boolean;
 }
 
 export default function RequestCard({
@@ -48,7 +52,10 @@ export default function RequestCard({
   onSend,
   onUpdateQuantity,
   showOnlySend = false,
-  allowEdit = false
+  allowEdit = false,
+  isSelected = false,
+  onSelect,
+  showCheckbox = false
 }: RequestCardProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -74,17 +81,26 @@ export default function RequestCard({
     )}>
       <CardHeader>
         <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-lg">{request.request_number}</CardTitle>
-              {getStatusBadge(request.status)}
-            </div>
-            <CardDescription className="mt-1">
-              {request.section_name} • {request.created_by_name} • {new Date(request.created_at).toLocaleDateString('ru-RU')}
-            </CardDescription>
-            {request.comment && (
-              <p className="text-sm text-gray-600 mt-2">{request.comment}</p>
+          <div className="flex items-start gap-3 flex-1">
+            {showCheckbox && onSelect && (
+              <Checkbox
+                checked={isSelected}
+                onCheckedChange={() => onSelect(request.id)}
+                className="mt-1"
+              />
             )}
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-lg">{request.request_number}</CardTitle>
+                {getStatusBadge(request.status)}
+              </div>
+              <CardDescription className="mt-1">
+                {request.section_name} • {request.created_by_name} • {new Date(request.created_at).toLocaleDateString('ru-RU')}
+              </CardDescription>
+              {request.comment && (
+                <p className="text-sm text-gray-600 mt-2">{request.comment}</p>
+              )}
+            </div>
           </div>
           <div className="flex gap-2">
             {onSend && request.status !== 'sent' && (

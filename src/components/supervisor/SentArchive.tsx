@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TabsContent } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 import RequestCard from './RequestCard';
 
@@ -32,6 +34,7 @@ interface RequestItem {
 
 export default function SentArchive() {
   const [requests, setRequests] = useState<Request[]>([]);
+  const [selectedRequests, setSelectedRequests] = useState<number[]>([]);
 
   useEffect(() => {
     loadRequests();
@@ -67,6 +70,58 @@ export default function SentArchive() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedRequests.length === 0) return;
+
+    const requestsToDelete = sentRequests.filter(r => selectedRequests.includes(r.id));
+    const requestNumbers = requestsToDelete.map(r => r.request_number).join(', ');
+
+    if (!confirm(`Удалить выбранные заявки из архива (${selectedRequests.length} шт.)?\n\nНомера: ${requestNumbers}\n\nЗаявки будут удалены безвозвратно.`)) return;
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const id of selectedRequests) {
+      try {
+        const response = await fetch(`${REQUESTS_API}?type=requests&id=${id}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      } catch (error) {
+        errorCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`Удалено заявок: ${successCount}`);
+    }
+    if (errorCount > 0) {
+      toast.error(`Ошибок при удалении: ${errorCount}`);
+    }
+
+    setSelectedRequests([]);
+    loadRequests();
+  };
+
+  const toggleSelectRequest = (id: number) => {
+    setSelectedRequests(prev => 
+      prev.includes(id) ? prev.filter(reqId => reqId !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedRequests.length === sentRequests.length) {
+      setSelectedRequests([]);
+    } else {
+      setSelectedRequests(sentRequests.map(r => r.id));
+    }
+  };
+
   const updateItemQuantity = async (itemId: number, quantityCompleted: number) => {
     try {
       const response = await fetch(REQUESTS_API + '?type=requests', {
@@ -95,8 +150,34 @@ export default function SentArchive() {
     <TabsContent value="sent-archive">
       <Card>
         <CardHeader>
-          <CardTitle>Архив отправленных заявок</CardTitle>
-          <CardDescription>Заявки, которые были отправлены заказчику</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Архив отправленных заявок</CardTitle>
+              <CardDescription>Заявки, которые были отправлены заказчику</CardDescription>
+            </div>
+            {sentRequests.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleSelectAll}
+                >
+                  <Icon name={selectedRequests.length === sentRequests.length ? 'CheckSquare' : 'Square'} size={16} className="mr-1" />
+                  {selectedRequests.length === sentRequests.length ? 'Снять всё' : 'Выбрать всё'}
+                </Button>
+                {selectedRequests.length > 0 && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleBulkDelete}
+                  >
+                    <Icon name="Trash2" size={16} className="mr-1" />
+                    Удалить ({selectedRequests.length})
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -112,6 +193,9 @@ export default function SentArchive() {
                   onDelete={handleDelete}
                   onUpdateQuantity={updateItemQuantity}
                   allowEdit
+                  isSelected={selectedRequests.includes(request.id)}
+                  onSelect={toggleSelectRequest}
+                  showCheckbox
                 />
               ))
             )}

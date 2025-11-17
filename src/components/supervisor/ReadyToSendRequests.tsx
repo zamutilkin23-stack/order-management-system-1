@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TabsContent } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 import RequestCard from './RequestCard';
 
@@ -32,6 +34,7 @@ interface RequestItem {
 
 export default function ReadyToSendRequests() {
   const [requests, setRequests] = useState<Request[]>([]);
+  const [selectedRequests, setSelectedRequests] = useState<number[]>([]);
 
   useEffect(() => {
     loadRequests();
@@ -68,14 +71,96 @@ export default function ReadyToSendRequests() {
     }
   };
 
+  const handleBulkSend = async () => {
+    if (selectedRequests.length === 0) return;
+
+    const requestsToSend = readyRequests.filter(r => selectedRequests.includes(r.id));
+    const requestNumbers = requestsToSend.map(r => r.request_number).join(', ');
+
+    if (!confirm(`Отправить выбранные заявки (${selectedRequests.length} шт.)?
+
+Номера: ${requestNumbers}`)) return;
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const id of selectedRequests) {
+      try {
+        const response = await fetch(`${REQUESTS_API}?type=requests&id=${id}&action=send`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'sent' })
+        });
+
+        if (response.ok) {
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      } catch (error) {
+        errorCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`Отправлено заявок: ${successCount}`);
+    }
+    if (errorCount > 0) {
+      toast.error(`Ошибок при отправке: ${errorCount}`);
+    }
+
+    setSelectedRequests([]);
+    loadRequests();
+  };
+
+  const toggleSelectRequest = (id: number) => {
+    setSelectedRequests(prev => 
+      prev.includes(id) ? prev.filter(reqId => reqId !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedRequests.length === readyRequests.length) {
+      setSelectedRequests([]);
+    } else {
+      setSelectedRequests(readyRequests.map(r => r.id));
+    }
+  };
+
   const readyRequests = requests.filter(r => r.status === 'completed');
 
   return (
     <TabsContent value="ready-to-send">
       <Card>
         <CardHeader>
-          <CardTitle>Готово к отправлению</CardTitle>
-          <CardDescription>Заявки готовые к отправке заказчику</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Готово к отправлению</CardTitle>
+              <CardDescription>Заявки готовые к отправке заказчику</CardDescription>
+            </div>
+            {readyRequests.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleSelectAll}
+                >
+                  <Icon name={selectedRequests.length === readyRequests.length ? 'CheckSquare' : 'Square'} size={16} className="mr-1" />
+                  {selectedRequests.length === readyRequests.length ? 'Снять всё' : 'Выбрать всё'}
+                </Button>
+                {selectedRequests.length > 0 && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleBulkSend}
+                  >
+                    <Icon name="Send" size={16} className="mr-1" />
+                    Отправить ({selectedRequests.length})
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -90,6 +175,9 @@ export default function ReadyToSendRequests() {
                   request={request}
                   onSend={handleSendRequest}
                   showOnlySend
+                  isSelected={selectedRequests.includes(request.id)}
+                  onSelect={toggleSelectRequest}
+                  showCheckbox
                 />
               ))
             )}
