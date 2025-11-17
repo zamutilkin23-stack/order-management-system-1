@@ -371,7 +371,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 return {
                     'statusCode': 400,
                     'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                    'body': json.dumps({'error': 'ID обязателен'}),
+                    'body': json.dumps({'error': 'ID не передан'}, ensure_ascii=False),
                     'isBase64Encoded': False
                 }
             

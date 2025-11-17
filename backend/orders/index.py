@@ -542,9 +542,28 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             shipment_id = params.get('shipment_id')
             
             # Handle request deletion
-            if request_type == 'requests' and order_id:
+            if request_type == 'requests':
+                if not order_id:
+                    return {
+                        'statusCode': 400,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'error': 'ID заявки не передан'}, ensure_ascii=False),
+                        'isBase64Encoded': False
+                    }
+                
                 cur.execute('DELETE FROM request_items WHERE request_id = %s', (order_id,))
-                cur.execute('DELETE FROM requests WHERE id = %s', (order_id,))
+                cur.execute('DELETE FROM requests WHERE id = %s RETURNING id', (order_id,))
+                deleted = cur.fetchone()
+                
+                if not deleted:
+                    conn.close()
+                    return {
+                        'statusCode': 404,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False),
+                        'isBase64Encoded': False
+                    }
+                
                 conn.commit()
                 cur.close()
                 conn.close()
@@ -558,6 +577,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             shipment_type = params.get('shipment_type')
             
+            # Handle shipment deletion (defects/брак)
             if shipment_id and shipment_type:
                 if shipment_type == 'free':
                     cur.execute(
@@ -606,23 +626,32 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     cur.execute("SELECT id FROM shipped_orders WHERE id = %s", (shipment_id,))
                     shipped_item = cur.fetchone()
                     
-                    if shipped_item:
-                        cur.execute("DELETE FROM shipped_orders WHERE id = %s", (shipment_id,))
-                        conn.commit()
-                        cur.close()
+                    if not shipped_item:
                         conn.close()
-                        
                         return {
-                            'statusCode': 200,
+                            'statusCode': 404,
                             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                            'body': json.dumps({'success': True, 'message': 'Брак утилизирован'}, ensure_ascii=False),
+                            'body': json.dumps({'error': 'Запись не найдена'}, ensure_ascii=False),
                             'isBase64Encoded': False
                         }
+                    
+                    cur.execute("DELETE FROM shipped_orders WHERE id = %s", (shipment_id,))
+                    conn.commit()
+                    cur.close()
+                    conn.close()
+                    
+                    return {
+                        'statusCode': 200,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'success': True, 'message': 'Брак утилизирован'}, ensure_ascii=False),
+                        'isBase64Encoded': False
+                    }
                 
+                conn.close()
                 return {
                     'statusCode': 400,
                     'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                    'body': json.dumps({'error': 'Неверный тип отправки'}),
+                    'body': json.dumps({'error': 'Неверный тип отправки'}, ensure_ascii=False),
                     'isBase64Encoded': False
                 }
             
