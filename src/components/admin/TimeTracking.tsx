@@ -114,9 +114,12 @@ export default function TimeTracking({ userRole }: TimeTrackingProps) {
       if (response.ok) {
         toast.success('Сотрудник удален');
         loadEmployees();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Ошибка удаления');
       }
     } catch (error) {
-      toast.error('Ошибка');
+      toast.error('Ошибка сервера');
     }
   };
 

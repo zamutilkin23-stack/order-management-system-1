@@ -114,9 +114,12 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
       if (response.ok) {
         toast.success('Материал удален');
         loadMaterials();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Ошибка удаления');
       }
     } catch (error) {
-      toast.error('Ошибка');
+      toast.error('Ошибка сервера');
     }
   };
 

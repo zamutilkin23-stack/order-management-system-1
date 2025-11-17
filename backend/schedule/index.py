@@ -216,25 +216,43 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             req_type = params.get('type')
             resource_id = params.get('id')
             
-            if req_type == 'employee' and resource_id:
-                cur.execute("UPDATE time_tracking SET employee_id = NULL WHERE employee_id = %s", (resource_id,))
-                cur.execute("UPDATE timesheet_employees SET full_name = full_name WHERE id = %s", (resource_id,))
-                conn.commit()
+            if req_type == 'employee':
+                if not resource_id:
+                    return {
+                        'statusCode': 400,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'error': 'ID сотрудника не передан'}, ensure_ascii=False),
+                        'isBase64Encoded': False
+                    }
                 
+                cur.execute("DELETE FROM time_tracking WHERE employee_id = %s", (resource_id,))
+                cur.execute("DELETE FROM timesheet_employees WHERE id = %s RETURNING id", (resource_id,))
+                deleted = cur.fetchone()
+                
+                if not deleted:
+                    conn.close()
+                    return {
+                        'statusCode': 404,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'error': 'Сотрудник не найден'}, ensure_ascii=False),
+                        'isBase64Encoded': False
+                    }
+                
+                conn.commit()
                 cur.close()
                 conn.close()
                 
                 return {
                     'statusCode': 200,
                     'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                    'body': json.dumps({'success': True}),
+                    'body': json.dumps({'success': True, 'message': 'Сотрудник удален'}, ensure_ascii=False),
                     'isBase64Encoded': False
                 }
             
             return {
                 'statusCode': 400,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'error': 'Укажите type=employee и id'}),
+                'body': json.dumps({'error': 'Укажите type=employee и id'}, ensure_ascii=False),
                 'isBase64Encoded': False
             }
         

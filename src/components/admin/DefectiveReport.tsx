@@ -77,7 +77,8 @@ export default function DefectiveReport({ userId }: DefectiveReportProps = {}) {
         toast.success('Брак утилизирован');
         loadData();
       } else {
-        toast.error('Ошибка утилизации');
+        const error = await response.json();
+        toast.error(error.error || 'Ошибка утилизации');
       }
     } catch (error) {
       toast.error('Ошибка сервера');

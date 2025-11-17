@@ -59,7 +59,8 @@ export default function SentArchive() {
         toast.success('Заявка удалена');
         loadRequests();
       } else {
-        toast.error('Ошибка удаления');
+        const error = await response.json();
+        toast.error(error.error || 'Ошибка удаления');
       }
     } catch (error) {
       toast.error('Ошибка сервера');
