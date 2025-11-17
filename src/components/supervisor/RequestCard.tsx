@@ -33,7 +33,7 @@ interface RequestCardProps {
   request: Request;
   onPrint?: (request: Request) => void;
   onExport?: (request: Request) => void;
-  onDelete?: (id: number) => void;
+  onDelete?: (id: number, requestNumber: string) => void;
   onSend?: (id: number) => void;
   onUpdateQuantity?: (itemId: number, quantity: number) => void;
   showOnlySend?: boolean;
@@ -121,7 +121,7 @@ export default function RequestCard({
                   <Button
                     size="sm"
                     variant="destructive"
-                    onClick={() => onDelete(request.id)}
+                    onClick={() => onDelete(request.id, request.request_number)}
                   >
                     <Icon name="Trash2" size={14} />
                   </Button>

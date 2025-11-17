@@ -47,8 +47,8 @@ export default function SentArchive() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Удалить заявку из архива?')) return;
+  const handleDelete = async (id: number, requestNumber: string) => {
+    if (!confirm(`Удалить заявку "${requestNumber}" из архива?\n\nЗаявка будет удалена безвозвратно.`)) return;
 
     try {
       const response = await fetch(`${REQUESTS_API}?type=requests&id=${id}`, {
@@ -56,7 +56,7 @@ export default function SentArchive() {
       });
 
       if (response.ok) {
-        toast.success('Заявка удалена');
+        toast.success(`Заявка "${requestNumber}" удалена`);
         loadRequests();
       } else {
         const error = await response.json();

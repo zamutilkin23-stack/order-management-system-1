@@ -106,13 +106,13 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Удалить материал?')) return;
+  const handleDelete = async (id: number, name: string) => {
+    if (!confirm(`Удалить материал "${name}"?\n\nМатериал будет удален из базы безвозвратно.`)) return;
 
     try {
       const response = await fetch(`${API}?id=${id}`, { method: 'DELETE' });
       if (response.ok) {
-        toast.success('Материал удален');
+        toast.success(`Материал "${name}" удален`);
         loadMaterials();
       } else {
         const error = await response.json();
@@ -296,7 +296,7 @@ export default function MaterialsManagement({ userId }: MaterialsManagementProps
                       <Button size="sm" variant="outline" onClick={() => handleEdit(material)}>
                         <Icon name="Edit" size={14} />
                       </Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleDelete(material.id)}>
+                      <Button size="sm" variant="destructive" onClick={() => handleDelete(material.id, material.name)}>
                         <Icon name="Trash2" size={14} />
                       </Button>
                     </div>

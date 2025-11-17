@@ -106,13 +106,13 @@ export default function TimeTracking({ userRole }: TimeTrackingProps) {
     }
   };
   
-  const deleteEmployee = async (id: number) => {
-    if (!confirm('Удалить сотрудника из списка?')) return;
+  const deleteEmployee = async (id: number, fullName: string) => {
+    if (!confirm(`Удалить сотрудника "${fullName}" из табеля?\n\nВсе данные о рабочем времени этого сотрудника будут удалены.`)) return;
     
     try {
       const response = await fetch(`${SCHEDULE_API}?type=employee&id=${id}`, { method: 'DELETE' });
       if (response.ok) {
-        toast.success('Сотрудник удален');
+        toast.success(`Сотрудник "${fullName}" удален`);
         loadEmployees();
       } else {
         const error = await response.json();
@@ -407,7 +407,7 @@ export default function TimeTracking({ userRole }: TimeTrackingProps) {
                             <Button size="sm" variant="outline" onClick={() => handleClearMonth(user.employee_id)} title="Очистить месяц">
                               <Icon name="X" size={14} />
                             </Button>
-                            <Button size="sm" variant="destructive" onClick={() => deleteEmployee(user.employee_id)} title="Удалить сотрудника">
+                            <Button size="sm" variant="destructive" onClick={() => deleteEmployee(user.employee_id, user.full_name)} title="Удалить сотрудника">
                               <Icon name="Trash2" size={14} />
                             </Button>
                           </div>
