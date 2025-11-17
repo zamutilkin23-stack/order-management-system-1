@@ -69,7 +69,7 @@ export default function DefectiveReport({ userId }: DefectiveReportProps = {}) {
     if (!confirm('Утилизировать брак?')) return;
 
     try {
-      const response = await fetch(`${ORDERS_API}?shipment_id=${itemId}`, {
+      const response = await fetch(`${ORDERS_API}?shipment_id=${itemId}&shipment_type=order`, {
         method: 'DELETE'
       });
 

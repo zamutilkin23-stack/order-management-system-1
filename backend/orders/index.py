@@ -603,46 +603,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         'isBase64Encoded': False
                     }
                 elif shipment_type == 'order':
-                    cur.execute("SELECT order_id FROM shipped_orders WHERE order_id = %s LIMIT 1", (shipment_id,))
-                    shipped_order = cur.fetchone()
+                    cur.execute("SELECT id FROM shipped_orders WHERE id = %s", (shipment_id,))
+                    shipped_item = cur.fetchone()
                     
-                    if shipped_order:
-                        shipped_order_id = shipped_order['order_id']
-                        
-                        cur.execute(
-                            "SELECT material_id, color_id, quantity, is_defective FROM shipped_orders WHERE order_id = %s",
-                            (shipped_order_id,)
-                        )
-                        shipped_items = cur.fetchall()
-                        
-                        for item in shipped_items:
-                            if not item['is_defective']:
-                                material_id = item['material_id']
-                                color_id = item['color_id']
-                                quantity = item['quantity']
-                                
-                                cur.execute(
-                                    "SELECT auto_deduct FROM materials WHERE id = %s",
-                                    (material_id,)
-                                )
-                                material = cur.fetchone()
-                                
-                                if material and material['auto_deduct']:
-                                    cur.execute(
-                                        "UPDATE materials SET quantity = quantity + %s WHERE id = %s",
-                                        (quantity, material_id)
-                                    )
-                                    
-                                    cur.execute(
-                                        """INSERT INTO material_color_inventory (material_id, color_id, quantity)
-                                           VALUES (%s, %s, %s)
-                                           ON CONFLICT (material_id, color_id)
-                                           DO UPDATE SET quantity = material_color_inventory.quantity + EXCLUDED.quantity""",
-                                        (material_id, color_id, quantity)
-                                    )
-                        
-                        cur.execute("DELETE FROM shipped_orders WHERE order_id = %s", (shipped_order_id,))
-                        cur.execute("UPDATE orders SET status = 'completed', shipped_at = NULL WHERE id = %s", (shipped_order_id,))
+                    if shipped_item:
+                        cur.execute("DELETE FROM shipped_orders WHERE id = %s", (shipment_id,))
                         conn.commit()
                         cur.close()
                         conn.close()
@@ -650,7 +615,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         return {
                             'statusCode': 200,
                             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                            'body': json.dumps({'success': True, 'message': 'Отправка удалена, материалы возвращены на склад'}),
+                            'body': json.dumps({'success': True, 'message': 'Брак утилизирован'}, ensure_ascii=False),
                             'isBase64Encoded': False
                         }
                 
