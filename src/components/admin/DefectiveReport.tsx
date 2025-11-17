@@ -9,6 +9,10 @@ import { toast } from 'sonner';
 const ORDERS_API = 'https://functions.poehali.dev/0ffd935b-d2ee-48e1-a9e4-2b8fe0ffb3dd';
 const MATERIALS_API = 'https://functions.poehali.dev/74905bf8-26b1-4b87-9a75-660316d4ba77';
 
+interface DefectiveReportProps {
+  userId?: number;
+}
+
 interface ShippedItem {
   id: number;
   order_id: number;
@@ -49,7 +53,7 @@ interface DefectiveStats {
   defect_rate: number;
 }
 
-export default function DefectiveReport() {
+export default function DefectiveReport({ userId }: DefectiveReportProps = {}) {
   const [shippedItems, setShippedItems] = useState<ShippedItem[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
@@ -60,6 +64,25 @@ export default function DefectiveReport() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleUtilizeDefect = async (itemId: number) => {
+    if (!confirm('Утилизировать брак?')) return;
+
+    try {
+      const response = await fetch(`${ORDERS_API}?shipment_id=${itemId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        toast.success('Брак утилизирован');
+        loadData();
+      } else {
+        toast.error('Ошибка утилизации');
+      }
+    } catch (error) {
+      toast.error('Ошибка сервера');
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -336,9 +359,19 @@ export default function DefectiveReport() {
                         </p>
                       </div>
                       
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-red-600">{item.quantity}</p>
-                        <p className="text-xs text-red-600">шт брака</p>
+                      <div className="text-right flex items-center gap-3">
+                        <div>
+                          <p className="text-2xl font-bold text-red-600">{item.quantity}</p>
+                          <p className="text-xs text-red-600">шт брака</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleUtilizeDefect(item.id)}
+                        >
+                          <Icon name="Trash2" size={14} className="mr-1" />
+                          Утилизировать
+                        </Button>
                       </div>
                     </div>
                   </div>

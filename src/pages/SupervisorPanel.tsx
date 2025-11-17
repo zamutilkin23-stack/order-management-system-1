@@ -13,6 +13,8 @@ import DefectiveReport from '@/components/admin/DefectiveReport';
 import MaterialsArrival from '@/components/manager/MaterialsArrival';
 import EmployeeManagement from '@/components/supervisor/EmployeeManagement';
 import RequestsManagement from '@/components/supervisor/RequestsManagement';
+import ReadyToSendRequests from '@/components/supervisor/ReadyToSendRequests';
+import SentArchive from '@/components/supervisor/SentArchive';
 
 interface User {
   id: number;
@@ -201,10 +203,18 @@ export default function SupervisorPanel({ user, onLogout }: SupervisorPanelProps
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="orders" className="space-y-6">
-          <TabsList className="grid w-full max-w-6xl grid-cols-10">
+          <TabsList className="grid w-full max-w-6xl grid-cols-11">
             <TabsTrigger value="requests">
               <Icon name="ClipboardList" size={16} className="mr-2" />
               Заявки
+            </TabsTrigger>
+            <TabsTrigger value="ready-to-send">
+              <Icon name="PackageCheck" size={16} className="mr-2" />
+              Готово
+            </TabsTrigger>
+            <TabsTrigger value="sent-archive">
+              <Icon name="Archive" size={16} className="mr-2" />
+              Архив
             </TabsTrigger>
             <TabsTrigger value="shipped">
               <Icon name="PackageCheck" size={16} className="mr-2" />
@@ -245,6 +255,10 @@ export default function SupervisorPanel({ user, onLogout }: SupervisorPanelProps
           </TabsList>
 
           <RequestsManagement userId={user.id} />
+
+          <ReadyToSendRequests />
+
+          <SentArchive />
 
           <ShippedOrders
             orders={orders}

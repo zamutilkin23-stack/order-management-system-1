@@ -37,7 +37,7 @@ interface ArrivalItem {
   quantity: string;
 }
 
-export default function MaterialsArrival({ userId }: { userId: number }) {
+export default function MaterialsArrival({ userId }: { userId?: number }) {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);

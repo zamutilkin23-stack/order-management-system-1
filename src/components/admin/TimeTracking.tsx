@@ -140,7 +140,7 @@ export default function TimeTracking({ userRole }: TimeTrackingProps) {
       });
 
       if (response.ok) {
-        await loadTimesheet();
+        loadTimesheet();
         toast.success('Сохранено', { duration: 1000 });
       } else {
         toast.error('Ошибка обновления');

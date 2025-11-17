@@ -31,11 +31,13 @@ interface Request {
 
 interface RequestCardProps {
   request: Request;
-  onPrint: (request: Request) => void;
-  onExport: (request: Request) => void;
-  onDelete: (id: number) => void;
+  onPrint?: (request: Request) => void;
+  onExport?: (request: Request) => void;
+  onDelete?: (id: number) => void;
   onSend?: (id: number) => void;
-  onUpdateQuantity: (itemId: number, quantity: number) => void;
+  onUpdateQuantity?: (itemId: number, quantity: number) => void;
+  showOnlySend?: boolean;
+  allowEdit?: boolean;
 }
 
 export default function RequestCard({
@@ -44,7 +46,9 @@ export default function RequestCard({
   onExport,
   onDelete,
   onSend,
-  onUpdateQuantity
+  onUpdateQuantity,
+  showOnlySend = false,
+  allowEdit = false
 }: RequestCardProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -93,27 +97,37 @@ export default function RequestCard({
                 Отправить
               </Button>
             )}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onPrint(request)}
-            >
-              <Icon name="Printer" size={14} />
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onExport(request)}
-            >
-              <Icon name="Download" size={14} />
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => onDelete(request.id)}
-            >
-              <Icon name="Trash2" size={14} />
-            </Button>
+            {!showOnlySend && (
+              <>
+                {onPrint && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onPrint(request)}
+                  >
+                    <Icon name="Printer" size={14} />
+                  </Button>
+                )}
+                {onExport && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onExport(request)}
+                  >
+                    <Icon name="Download" size={14} />
+                  </Button>
+                )}
+                {onDelete && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => onDelete(request.id)}
+                  >
+                    <Icon name="Trash2" size={14} />
+                  </Button>
+                )}
+              </>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -146,20 +160,22 @@ export default function RequestCard({
                 <TableCell>{item.size || '—'}</TableCell>
                 <TableCell className="text-sm text-gray-600">{item.comment || '—'}</TableCell>
                 <TableCell>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        const newQty = prompt('Введите выполненное количество:', String(item.quantity_completed));
-                        if (newQty !== null) {
-                          onUpdateQuantity(item.id, Number(newQty));
-                        }
-                      }}
-                    >
-                      <Icon name="Edit" size={14} />
-                    </Button>
-                  </div>
+                  {(onUpdateQuantity && (request.status !== 'sent' || allowEdit)) && (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const newQty = prompt('Введите выполненное количество:', String(item.quantity_completed));
+                          if (newQty !== null) {
+                            onUpdateQuantity(item.id, Number(newQty));
+                          }
+                        }}
+                      >
+                        <Icon name="Edit" size={14} />
+                      </Button>
+                    </div>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
